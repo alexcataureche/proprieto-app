@@ -94,51 +94,67 @@ def calculeaza_taxe(venit_brut_ron):
 
 def genereaza_pdf_d212(fisc, an_fiscal):
     """Generează PDF cu instrucțiuni D212"""
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, f"Ghid Completare D212 - An Fiscal {an_fiscal}", ln=True, align="C")
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 10, f"Ghid Completare D212 - An Fiscal {an_fiscal}", ln=True, align="C")
 
-    pdf.set_font("Helvetica", "", 11)
-    pdf.ln(10)
+        pdf.set_font("Helvetica", "", 11)
+        pdf.ln(10)
 
-    # Secțiunea I - Date identificare
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "SECȚIUNEA I - Date de identificare", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(0, 6, "Completează CNP, nume, prenume și adresa conform CI.")
-    pdf.ln(5)
+        # Secțiunea I - Date identificare
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "SECTIUNEA I - Date de identificare", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 6, "Completeaza CNP, nume, prenume si adresa conform CI.")
+        pdf.ln(5)
 
-    # Secțiunea II - Venituri
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "SECȚIUNEA II - Venituri din cedarea folosinței bunurilor", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Rd. 01 - Venit brut: {fisc['brut']:,.2f} RON", ln=True)
-    pdf.cell(0, 6, f"Rd. 02 - Cheltuieli forfetare (20%): {fisc['brut']*0.2:,.2f} RON", ln=True)
-    pdf.cell(0, 6, f"Rd. 03 - Venit net anual: {fisc['net']:,.2f} RON", ln=True)
-    pdf.ln(5)
+        # Secțiunea II - Venituri
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "SECTIUNEA II - Venituri din cedarea folosintei bunurilor", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, f"Rd. 01 - Venit brut: {fisc['brut']:,.2f} RON", ln=True)
+        pdf.cell(0, 6, f"Rd. 02 - Cheltuieli forfetare (20%): {fisc['brut']*0.2:,.2f} RON", ln=True)
+        pdf.cell(0, 6, f"Rd. 03 - Venit net anual: {fisc['net']:,.2f} RON", ln=True)
+        pdf.ln(5)
 
-    # Secțiunea III - Impozit
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "SECȚIUNEA III - Calculul impozitului", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Impozit datorat (10% din venit net): {fisc['impozit']:,.2f} RON", ln=True)
-    pdf.ln(5)
+        # Secțiunea III - Impozit
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "SECTIUNEA III - Calculul impozitului", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, f"Impozit datorat (10% din venit net): {fisc['impozit']:,.2f} RON", ln=True)
+        pdf.ln(5)
 
-    # Secțiunea IV - CASS
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "SECȚIUNEA IV - Contribuția de asigurări sociale de sănătate", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"BIFEAZĂ PRAGUL {fisc['prag']} (vezi instrucțiuni)", ln=True)
-    pdf.cell(0, 6, f"CASS datorat: {fisc['cass']:,.2f} RON", ln=True)
-    pdf.multi_cell(0, 6, f"Explicație: {fisc['explicatie']}")
-    pdf.ln(5)
+        # Secțiunea IV - CASS
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "SECTIUNEA IV - Contributia de asigurari sociale de sanatate", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, f"BIFEAZA PRAGUL {fisc['prag']} (vezi instructiuni)", ln=True)
+        pdf.cell(0, 6, f"CASS datorat: {fisc['cass']:,.2f} RON", ln=True)
 
-    # Total
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, f"TOTAL DE PLATĂ: {fisc['total_taxe']:,.2f} RON", ln=True, border=1, align="C")
+        # Explicație fără caractere speciale
+        explicatie_clean = fisc['explicatie'].replace('≥', '>=').replace('→', '->')
+        pdf.multi_cell(0, 6, f"Explicatie: {explicatie_clean}")
+        pdf.ln(5)
 
-    return pdf.output(dest='S').encode('latin-1')
+        # Total
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, f"TOTAL DE PLATA: {fisc['total_taxe']:,.2f} RON", ln=True, border=1, align="C")
+
+        return pdf.output()
+    except Exception as e:
+        # Fallback: returnează un PDF minimal
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, f"Rezumat Fiscal {an_fiscal}", ln=True)
+        pdf.set_font("Helvetica", "", 11)
+        pdf.cell(0, 8, f"Venit Brut: {fisc['brut']:,.2f} RON", ln=True)
+        pdf.cell(0, 8, f"Impozit: {fisc['impozit']:,.2f} RON", ln=True)
+        pdf.cell(0, 8, f"CASS: {fisc['cass']:,.2f} RON", ln=True)
+        pdf.cell(0, 8, f"Prag CASS D212: {fisc['prag']}", ln=True)
+        return pdf.output()
 
 # --- INTERFAȚĂ ---
 st.sidebar.title("🏢 Proprieto ANAF 2026")
