@@ -17,39 +17,64 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM CSS FOR IMPROVED UX ---
+# --- CUSTOM CSS WITH EXACT DESIGN SYSTEM COLORS ---
 st.markdown("""
 <style>
-    /* Main theme colors */
+    /* ============================================
+       DESIGN SYSTEM - EXACT COLOR PALETTE
+       ============================================ */
     :root {
-        --primary-color: #2E7D32;
-        --secondary-color: #1565C0;
-        --accent-color: #F57C00;
-        --success-color: #43A047;
-        --warning-color: #FFA726;
-        --error-color: #E53935;
-        --background-light: #F5F7FA;
-        --text-dark: #2C3E50;
+        /* Primary Colors */
+        --primary-color: #2563EB;        /* Primary Blue - Buttons/Active states */
+        --primary-hover: #1D4ED8;        /* Primary hover state */
+        --navy: #1E293B;                 /* Navy - Titles/Sidebar/Text */
+        --app-bg: #F8FAFC;               /* App Background - Page background */
+        --surface: #FFFFFF;              /* Surface - Cards/Table background */
+
+        /* Borders */
+        --border-color: #E2E8F0;         /* Input borders */
+        --border-hover: #F1F5F9;         /* Hover effect on table rows */
+
+        /* Semantic Badge Colors */
+        --success-bg: #D1FAE5;           /* Success badge background */
+        --success-text: #065F46;         /* Success badge text */
+        --warning-bg: #FEF3C7;           /* Warning badge background */
+        --warning-text: #92400E;         /* Warning badge text */
+        --danger-bg: #FEE2E2;            /* Danger badge background */
+        --danger-text: #991B1B;          /* Danger badge text */
+
+        /* Info Banner (Admin mode) */
+        --info-banner-bg: #EFF6FF;       /* Info banner background */
+        --info-banner-text: #1E40AF;     /* Info banner text */
+
+        /* Grays */
+        --gray-500: #64748B;             /* Gray text for secondary info */
+        --gray-600: #475569;
+        --gray-700: #334155;
     }
 
-    /* Main container styling */
+    /* ============================================
+       MAIN LAYOUT - LIGHT BACKGROUND
+       ============================================ */
     .main {
         padding: 2rem 3rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        background-attachment: fixed;
+        background: var(--app-bg) !important;  /* Solid light background */
     }
 
     .block-container {
         padding: 2rem 1rem;
         max-width: 1400px;
-        background: white;
+        background: var(--surface);
         border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid var(--border-color);
     }
 
-    /* Headers styling */
+    /* ============================================
+       TYPOGRAPHY - NAVY TEXT
+       ============================================ */
     h1 {
-        color: var(--primary-color) !important;
+        color: var(--navy) !important;
         font-weight: 700 !important;
         margin-bottom: 1.5rem !important;
         padding-bottom: 0.5rem;
@@ -57,133 +82,69 @@ st.markdown("""
     }
 
     h2, h3 {
-        color: var(--text-dark) !important;
+        color: var(--navy) !important;
         font-weight: 600 !important;
     }
 
-    /* Improved cards */
-    .element-container {
-        transition: transform 0.2s ease;
+    p, span, div {
+        color: var(--navy);
     }
 
-    /* Metric cards */
-    [data-testid="stMetricValue"] {
-        font-size: 2rem !important;
-        font-weight: 700 !important;
-        color: var(--primary-color) !important;
-    }
-
-    [data-testid="stMetricLabel"] {
-        font-size: 1rem !important;
-        font-weight: 600 !important;
-        color: var(--text-dark) !important;
-    }
-
-    /* Buttons */
+    /* ============================================
+       BUTTONS - PRIMARY BLUE
+       ============================================ */
     .stButton>button {
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s ease;
-        border: none;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
     .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
     .stButton>button[kind="primary"] {
-        background: linear-gradient(135deg, var(--primary-color), #1B5E20);
+        background: var(--primary-color) !important;
+        color: white !important;
+        border: none;
     }
 
-    /* Forms */
+    .stButton>button[kind="primary"]:hover {
+        background: var(--primary-hover) !important;
+    }
+
+    /* ============================================
+       FORMS - BORDERS #E2E8F0, TEXT NAVY
+       ============================================ */
     .stTextInput>div>div>input,
     .stNumberInput>div>div>input,
     .stSelectbox>div>div>select,
     .stDateInput>div>div>input {
         border-radius: 8px;
-        border: 2px solid #E0E0E0;
+        border: 1px solid var(--border-color) !important;
         padding: 0.75rem;
         transition: border-color 0.3s ease;
+        color: var(--navy) !important;
+        background: var(--surface) !important;
     }
 
     .stTextInput>div>div>input:focus,
     .stNumberInput>div>div>input:focus,
-    .stSelectbox>div>div>select:focus {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+    .stSelectbox>div>div>select:focus,
+    .stDateInput>div>div>input:focus {
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+        outline: none !important;
     }
 
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: var(--background-light);
-        padding: 0.5rem;
-        border-radius: 10px;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: rgba(46, 125, 50, 0.1);
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: var(--primary-color) !important;
-        color: white !important;
-    }
-
-    /* Expanders */
-    .streamlit-expanderHeader {
-        background-color: var(--background-light);
-        border-radius: 10px;
-        padding: 1rem;
-        font-weight: 600;
-        border-left: 4px solid var(--primary-color);
-    }
-
-    .streamlit-expanderHeader:hover {
-        background-color: #E8EAF6;
-    }
-
-    /* Success/Info/Warning/Error messages */
-    .stSuccess {
-        background-color: #E8F5E9;
-        border-left: 4px solid var(--success-color);
-        border-radius: 8px;
-        padding: 1rem;
-    }
-
-    .stInfo {
-        background-color: #E3F2FD;
-        border-left: 4px solid var(--secondary-color);
-        border-radius: 8px;
-        padding: 1rem;
-    }
-
-    .stWarning {
-        background-color: #FFF3E0;
-        border-left: 4px solid var(--warning-color);
-        border-radius: 8px;
-        padding: 1rem;
-    }
-
-    .stError {
-        background-color: #FFEBEE;
-        border-left: 4px solid var(--error-color);
-        border-radius: 8px;
-        padding: 1rem;
-    }
-
-    /* Sidebar */
+    /* ============================================
+       SIDEBAR - PRIMARY BLUE GRADIENT
+       ============================================ */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #2E7D32 0%, #1B5E20 100%);
+        background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-hover) 100%);
         padding: 2rem 1rem;
     }
 
@@ -214,58 +175,214 @@ st.markdown("""
         transform: translateX(5px);
     }
 
-    /* Dataframe */
+    /* ============================================
+       TABS - PRIMARY BLUE ACTIVE STATE
+       ============================================ */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: var(--surface);
+        padding: 0.5rem;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        color: var(--navy);
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: var(--border-hover);
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: var(--primary-color) !important;
+        color: white !important;
+    }
+
+    /* ============================================
+       EXPANDERS
+       ============================================ */
+    .streamlit-expanderHeader {
+        background-color: var(--surface);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1rem;
+        font-weight: 600;
+        border-left: 4px solid var(--primary-color);
+        color: var(--navy);
+    }
+
+    .streamlit-expanderHeader:hover {
+        background-color: var(--border-hover);
+    }
+
+    /* ============================================
+       MESSAGES - SEMANTIC COLORS
+       ============================================ */
+    .stSuccess {
+        background-color: var(--success-bg) !important;
+        color: var(--success-text) !important;
+        border-left: 4px solid var(--success-text);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .stInfo {
+        background-color: var(--info-banner-bg) !important;
+        color: var(--info-banner-text) !important;
+        border-left: 4px solid var(--info-banner-text);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .stWarning {
+        background-color: var(--warning-bg) !important;
+        color: var(--warning-text) !important;
+        border-left: 4px solid var(--warning-text);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .stError {
+        background-color: var(--danger-bg) !important;
+        color: var(--danger-text) !important;
+        border-left: 4px solid var(--danger-text);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    /* ============================================
+       DATAFRAMES - HOVER EFFECT #F1F5F9
+       ============================================ */
     .stDataFrame {
         border-radius: 10px;
         overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid var(--border-color);
     }
 
-    /* Custom card class */
+    .stDataFrame tbody tr:hover {
+        background-color: var(--border-hover) !important;
+        transition: background-color 0.2s ease;
+    }
+
+    /* ============================================
+       METRIC CARDS
+       ============================================ */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem !important;
+        font-weight: 700 !important;
+        color: var(--primary-color) !important;
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        color: var(--navy) !important;
+    }
+
+    /* ============================================
+       CUSTOM CARD CLASS
+       ============================================ */
     .custom-card {
-        background: white;
+        background: var(--surface);
         padding: 1.5rem;
         border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         margin: 1rem 0;
         transition: all 0.3s ease;
+        border: 1px solid var(--border-color);
         border-left: 4px solid var(--primary-color);
     }
 
     .custom-card:hover {
-        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         transform: translateY(-2px);
     }
 
-    /* Download button */
+    /* ============================================
+       DOWNLOAD BUTTON
+       ============================================ */
     .stDownloadButton>button {
-        background: linear-gradient(135deg, var(--secondary-color), #0D47A1);
-        color: white;
+        background: var(--primary-color) !important;
+        color: white !important;
         font-weight: 600;
         border-radius: 8px;
         padding: 0.75rem 1.5rem;
+        border: none;
     }
 
-    /* Divider */
+    .stDownloadButton>button:hover {
+        background: var(--primary-hover) !important;
+    }
+
+    /* ============================================
+       DIVIDER
+       ============================================ */
     hr {
         margin: 2rem 0;
         border: none;
-        border-top: 2px solid var(--background-light);
+        border-top: 1px solid var(--border-color);
     }
 
-    /* Slider */
+    /* ============================================
+       SLIDER
+       ============================================ */
     .stSlider [data-baseweb="slider"] {
         padding: 1rem 0;
     }
 
-    /* Animation for balloons */
+    .stSlider [role="slider"] {
+        background-color: var(--primary-color) !important;
+    }
+
+    /* ============================================
+       ANIMATIONS
+       ============================================ */
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
+        from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
     .element-container {
-        animation: fadeIn 0.5s ease;
+        animation: fadeIn 0.3s ease;
+    }
+
+    /* ============================================
+       BADGE STYLES (Custom HTML badges)
+       ============================================ */
+    .badge-success {
+        background-color: var(--success-bg);
+        color: var(--success-text);
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .badge-warning {
+        background-color: var(--warning-bg);
+        color: var(--warning-text);
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .badge-danger {
+        background-color: var(--danger-bg);
+        color: var(--danger-text);
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
