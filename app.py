@@ -9,7 +9,265 @@ import auth  # Modul de autentificare
 import coproprietate  # Modul de co-proprietate
 
 # --- CONFIGURARE ---
-st.set_page_config(page_title="Proprieto 2026", layout="wide", page_icon="🏠")
+st.set_page_config(
+    page_title="Proprieto ANAF 2026",
+    layout="wide",
+    page_icon="🏠",
+    initial_sidebar_state="expanded"
+)
+
+# --- CUSTOM CSS FOR IMPROVED UX ---
+st.markdown("""
+<style>
+    /* Main theme colors */
+    :root {
+        --primary-color: #2E7D32;
+        --secondary-color: #1565C0;
+        --accent-color: #F57C00;
+        --success-color: #43A047;
+        --warning-color: #FFA726;
+        --error-color: #E53935;
+        --background-light: #F5F7FA;
+        --text-dark: #2C3E50;
+    }
+
+    /* Main container styling */
+    .main {
+        padding: 2rem 3rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+
+    .block-container {
+        padding: 2rem 1rem;
+        max-width: 1400px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    /* Headers styling */
+    h1 {
+        color: var(--primary-color) !important;
+        font-weight: 700 !important;
+        margin-bottom: 1.5rem !important;
+        padding-bottom: 0.5rem;
+        border-bottom: 3px solid var(--primary-color);
+    }
+
+    h2, h3 {
+        color: var(--text-dark) !important;
+        font-weight: 600 !important;
+    }
+
+    /* Improved cards */
+    .element-container {
+        transition: transform 0.2s ease;
+    }
+
+    /* Metric cards */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem !important;
+        font-weight: 700 !important;
+        color: var(--primary-color) !important;
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        color: var(--text-dark) !important;
+    }
+
+    /* Buttons */
+    .stButton>button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .stButton>button[kind="primary"] {
+        background: linear-gradient(135deg, var(--primary-color), #1B5E20);
+    }
+
+    /* Forms */
+    .stTextInput>div>div>input,
+    .stNumberInput>div>div>input,
+    .stSelectbox>div>div>select,
+    .stDateInput>div>div>input {
+        border-radius: 8px;
+        border: 2px solid #E0E0E0;
+        padding: 0.75rem;
+        transition: border-color 0.3s ease;
+    }
+
+    .stTextInput>div>div>input:focus,
+    .stNumberInput>div>div>input:focus,
+    .stSelectbox>div>div>select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: var(--background-light);
+        padding: 0.5rem;
+        border-radius: 10px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: rgba(46, 125, 50, 0.1);
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: var(--primary-color) !important;
+        color: white !important;
+    }
+
+    /* Expanders */
+    .streamlit-expanderHeader {
+        background-color: var(--background-light);
+        border-radius: 10px;
+        padding: 1rem;
+        font-weight: 600;
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .streamlit-expanderHeader:hover {
+        background-color: #E8EAF6;
+    }
+
+    /* Success/Info/Warning/Error messages */
+    .stSuccess {
+        background-color: #E8F5E9;
+        border-left: 4px solid var(--success-color);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .stInfo {
+        background-color: #E3F2FD;
+        border-left: 4px solid var(--secondary-color);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .stWarning {
+        background-color: #FFF3E0;
+        border-left: 4px solid var(--warning-color);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .stError {
+        background-color: #FFEBEE;
+        border-left: 4px solid var(--error-color);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #2E7D32 0%, #1B5E20 100%);
+        padding: 2rem 1rem;
+    }
+
+    [data-testid="stSidebar"] .element-container {
+        color: white;
+    }
+
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label {
+        color: white !important;
+    }
+
+    /* Radio buttons in sidebar */
+    [data-testid="stSidebar"] .stRadio label {
+        background-color: rgba(255,255,255,0.1);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        margin: 0.25rem 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    [data-testid="stSidebar"] .stRadio label:hover {
+        background-color: rgba(255,255,255,0.2);
+        transform: translateX(5px);
+    }
+
+    /* Dataframe */
+    .stDataFrame {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* Custom card class */
+    .custom-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin: 1rem 0;
+        transition: all 0.3s ease;
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .custom-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+
+    /* Download button */
+    .stDownloadButton>button {
+        background: linear-gradient(135deg, var(--secondary-color), #0D47A1);
+        color: white;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+    }
+
+    /* Divider */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        border-top: 2px solid var(--background-light);
+    }
+
+    /* Slider */
+    .stSlider [data-baseweb="slider"] {
+        padding: 1rem 0;
+    }
+
+    /* Animation for balloons */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .element-container {
+        animation: fadeIn 0.5s ease;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Inițializare session state pentru autentificare
 auth.init_session_state()
