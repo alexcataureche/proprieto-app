@@ -235,7 +235,7 @@ page = st.sidebar.radio("Navigare:", pages_user)
 if page == "👤 Cont":
     st.title("👤 Contul Meu")
 
-    tab1, tab2 = st.tabs(["📋 Informații", "🔒 Schimbă Parola"])
+    tab1, tab2, tab3 = st.tabs(["📋 Informații", "✏️ Editează Profil", "🔒 Schimbă Parola"])
 
     with tab1:
         st.subheader("Informații Cont")
@@ -243,24 +243,159 @@ if page == "👤 Cont":
         col1, col2 = st.columns(2)
         with col1:
             st.text_input("Email", value=st.session_state.user_email, disabled=True)
+            st.text_input("Nume", value=st.session_state.get('user_name', 'N/A'), disabled=True)
         with col2:
             st.text_input("Rol", value=st.session_state.user_role, disabled=True)
 
+            # Afișare dată înregistrare și ultimul login
+            try:
+                user_info = supabase.table("users").select("created_at, last_login").eq("id", st.session_state.user_id).execute()
+                if user_info.data:
+                    created_at = pd.to_datetime(user_info.data[0]['created_at']).strftime('%d-%m-%Y')
+                    last_login = pd.to_datetime(user_info.data[0]['last_login']).strftime('%d-%m-%Y %H:%M') if user_info.data[0].get('last_login') else 'N/A'
+                    st.text_input("Înregistrat", value=created_at, disabled=True)
+                    st.text_input("Ultimul login", value=last_login, disabled=True)
+            except:
+                pass
+
+        st.markdown("---")
+        st.info("💡 Pentru a edita numele sau parola, folosește tab-urile de mai sus.")
+
     with tab2:
+        st.subheader("✏️ Editează Profil")
+
+        st.markdown("#### Informații Personale")
+
+        with st.form("edit_profile_form"):
+            current_name = st.session_state.get('user_name', st.session_state.user_email)
+
+            new_name = st.text_input(
+                "Nume Complet",
+                value=current_name,
+                placeholder="ex: Popescu Ion",
+                help="Numele afișat în aplicație"
+            )
+
+            st.caption("📧 Email-ul nu poate fi modificat pentru securitate")
+
+            col_save, col_cancel = st.columns(2)
+
+            with col_save:
+                submitted_profile = st.form_submit_button("💾 Salvează", use_container_width=True, type="primary")
+
+            if submitted_profile:
+                if not new_name.strip():
+                    st.error("❌ Numele nu poate fi gol!")
+                elif len(new_name.strip()) < 3:
+                    st.error("❌ Numele trebuie să aibă minim 3 caractere!")
+                elif len(new_name.strip()) > 100:
+                    st.error("❌ Numele este prea lung (max 100 caractere)")
+                else:
+                    try:
+                        # Actualizează numele în baza de date
+                        supabase.table("users").update({
+                            "nume": new_name.strip()
+                        }).eq("id", st.session_state.user_id).execute()
+
+                        # Actualizează session state
+                        st.session_state.user_name = new_name.strip()
+
+                        st.success(f"✅ Profil actualizat cu succes!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Eroare la actualizare: {str(e)}")
+
+    with tab3:
         st.subheader("🔒 Schimbă Parola")
 
-        with st.form("change_password_form"):
-            old_pwd = st.text_input("Parola Curentă", type="password")
-            new_pwd = st.text_input("Parolă Nouă", type="password")
-            confirm_pwd = st.text_input("Confirmă Parola Nouă", type="password")
+        st.markdown("#### Requisites Parolă")
+        st.info("""
+        ✅ Minim 8 caractere
+        ✅ Recomandat: combinație de litere, cifre și caractere speciale
+        ✅ Nu folosi parole ușor de ghicit (ex: 123456, password, etc.)
+        """)
 
-            submitted = st.form_submit_button("💾 Schimbă Parola")
+        with st.form("change_password_form"):
+            old_pwd = st.text_input("Parola Curentă*", type="password", placeholder="Introdu parola curentă")
+
+            st.markdown("---")
+
+            new_pwd = st.text_input("Parolă Nouă*", type="password", placeholder="Minim 8 caractere")
+
+            # Indicator putere parolă
+            if new_pwd:
+                strength = 0
+                feedback = []
+
+                if len(new_pwd) >= 8:
+                    strength += 1
+                else:
+                    feedback.append("❌ Prea scurtă (minim 8 caractere)")
+
+                if len(new_pwd) >= 12:
+                    strength += 1
+                    feedback.append("✅ Lungime bună")
+
+                if any(c.isupper() for c in new_pwd) and any(c.islower() for c in new_pwd):
+                    strength += 1
+                    feedback.append("✅ Conține litere mari și mici")
+                else:
+                    feedback.append("⚠️ Adaugă litere mari și mici")
+
+                if any(c.isdigit() for c in new_pwd):
+                    strength += 1
+                    feedback.append("✅ Conține cifre")
+                else:
+                    feedback.append("⚠️ Adaugă cifre")
+
+                if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in new_pwd):
+                    strength += 1
+                    feedback.append("✅ Conține caractere speciale")
+                else:
+                    feedback.append("💡 Opțional: adaugă caractere speciale")
+
+                # Afișare indicator putere
+                if strength <= 2:
+                    st.warning(f"🔴 **Parolă Slabă** ({strength}/5)")
+                elif strength <= 3:
+                    st.info(f"🟡 **Parolă Medie** ({strength}/5)")
+                else:
+                    st.success(f"🟢 **Parolă Puternică** ({strength}/5)")
+
+                # Afișare feedback
+                for fb in feedback:
+                    st.caption(fb)
+
+            confirm_pwd = st.text_input("Confirmă Parola Nouă*", type="password", placeholder="Re-introdu parola nouă")
+
+            st.markdown("---")
+
+            col_submit, col_info = st.columns([1, 2])
+
+            with col_submit:
+                submitted = st.form_submit_button("🔒 Schimbă Parola", use_container_width=True, type="primary")
+
+            with col_info:
+                st.caption("⚠️ Vei rămâne autentificat după schimbarea parolei")
 
             if submitted:
+                erori = []
+
                 if not old_pwd or not new_pwd or not confirm_pwd:
-                    st.error("❌ Toate câmpurile sunt obligatorii!")
-                elif new_pwd != confirm_pwd:
-                    st.error("❌ Parolele noi nu se potrivesc!")
+                    erori.append("Toate câmpurile sunt obligatorii")
+
+                if len(new_pwd) < 8:
+                    erori.append("Parola nouă trebuie să aibă minim 8 caractere")
+
+                if new_pwd != confirm_pwd:
+                    erori.append("Parolele noi nu se potrivesc")
+
+                if old_pwd == new_pwd:
+                    erori.append("Parola nouă trebuie să fie diferită de cea veche")
+
+                if erori:
+                    for err in erori:
+                        st.error(f"❌ {err}")
                 else:
                     success, message = auth.change_password(
                         supabase,
@@ -271,8 +406,11 @@ if page == "👤 Cont":
 
                     if success:
                         st.success(f"✅ {message}")
+                        st.balloons()
+                        st.info("💡 Parola a fost schimbată cu succes! Poți continua să folosești aplicația.")
                     else:
                         st.error(f"❌ {message}")
+
 
 # ==================== PAGINĂ: ADMINISTRARE ====================
 elif page == "⚙️ Administrare" and auth.is_admin():
