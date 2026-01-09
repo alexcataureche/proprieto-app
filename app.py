@@ -6,6 +6,7 @@ from io import BytesIO
 import datetime
 from dateutil.relativedelta import relativedelta
 import auth  # Modul de autentificare
+import coproprietate  # Modul de co-proprietate
 
 # --- CONFIGURARE ---
 st.set_page_config(page_title="Proprieto 2026", layout="wide", page_icon="🏠")
@@ -453,34 +454,119 @@ elif page == "🏠 Gestiune Imobile":
 
     # Formular adăugare
     with st.expander("➕ Adaugă Imobil Nou", expanded=True):
-        with st.form("imobil_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                nume = st.text_input("Nume Identificare*", placeholder="ex: Apartament Centru")
-            with col2:
-                adr = st.text_input("Adresă Completă", placeholder="ex: Str. Victoriei nr. 10, București")
+        tab1, tab2 = st.tabs(["👤 Proprietate Singulară", "👥 Co-proprietate"])
 
-            proc = st.slider("Procent Proprietate (%)", 0, 100, 100, help="Cotă de proprietate deținută")
+        with tab1:
+            # Formular clasic - un singur proprietar
+            with st.form("imobil_form_single"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nume = st.text_input("Nume Identificare*", placeholder="ex: Apartament Centru")
+                with col2:
+                    adr = st.text_input("Adresă Completă", placeholder="ex: Str. Victoriei nr. 10, București")
 
-            submitted = st.form_submit_button("💾 Salvează Imobil", use_container_width=True)
+                proc = st.slider("Procent Proprietate (%)", 0, 100, 100, help="Cotă de proprietate deținută")
 
-            if submitted:
-                if not nume.strip():
-                    st.error("❌ Numele imobilului este obligatoriu!")
-                elif len(nume) > 100:
-                    st.error("❌ Numele este prea lung (max 100 caractere)")
-                else:
-                    try:
-                        supabase.table("imobile").insert({
-                            "nume": nume.strip(),
-                            "adresa": adr.strip() if adr else None,
-                            "procent_proprietate": proc,
-                            "user_id": st.session_state.user_id
-                        }).execute()
-                        st.success(f"✅ Imobil '{nume}' a fost înregistrat!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Eroare la salvare: {str(e)}")
+                submitted = st.form_submit_button("💾 Salvează Imobil", use_container_width=True)
+
+                if submitted:
+                    if not nume.strip():
+                        st.error("❌ Numele imobilului este obligatoriu!")
+                    elif len(nume) > 100:
+                        st.error("❌ Numele este prea lung (max 100 caractere)")
+                    else:
+                        try:
+                            # Creează imobilul
+                            result = supabase.table("imobile").insert({
+                                "nume": nume.strip(),
+                                "adresa": adr.strip() if adr else None,
+                                "procent_proprietate": proc,
+                                "user_id": st.session_state.user_id
+                            }).execute()
+
+                            # Adaugă în tabelul de legătură
+                            if result.data:
+                                imobil_id = result.data[0]['id']
+                                supabase.table("imobile_proprietari").insert({
+                                    "imobil_id": imobil_id,
+                                    "user_id": st.session_state.user_id,
+                                    "procent_proprietate": proc
+                                }).execute()
+
+                            st.success(f"✅ Imobil '{nume}' a fost înregistrat!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Eroare la salvare: {str(e)}")
+
+        with tab2:
+            # Formular co-proprietate - multipli proprietari
+            st.info("💡 Creează un imobil cu multipli co-proprietari. Suma procentelor trebuie să fie 100%.")
+
+            with st.form("imobil_form_copro"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nume_copro = st.text_input("Nume Identificare*", placeholder="ex: Apartament Centru", key="nume_copro")
+                with col2:
+                    adr_copro = st.text_input("Adresă Completă", placeholder="ex: Str. Victoriei nr. 10, București", key="adr_copro")
+
+                st.markdown("### 👥 Co-proprietari")
+
+                # Preluare lista utilizatori pentru selecție
+                try:
+                    users_list = supabase.table("users").select("id, nume, email").eq("active", True).order("nume").execute()
+                    users_dict = {u['id']: f"{u['nume']} ({u['email']})" for u in users_list.data}
+                except:
+                    users_dict = {}
+                    st.error("Eroare la încărcarea utilizatorilor")
+
+                # Proprietarul 1 (utilizatorul curent)
+                st.markdown(f"**Proprietar 1:** {st.session_state.user_name} (Tu)")
+                procent1 = st.slider("Procent proprietate (%)", 0, 100, 50, key="proc1")
+
+                # Proprietarul 2
+                if users_dict:
+                    other_users = {k: v for k, v in users_dict.items() if k != st.session_state.user_id}
+                    if other_users:
+                        st.markdown("**Proprietar 2:**")
+                        user2_id = st.selectbox("Selectează co-proprietar", options=list(other_users.keys()),
+                                               format_func=lambda x: other_users[x], key="user2")
+                        procent2 = st.slider("Procent proprietate (%)", 0, 100, 50, key="proc2")
+
+                        # Afișare sumă procentă
+                        suma_procente = procent1 + procent2
+                        if suma_procente == 100:
+                            st.success(f"✅ Suma procentelor: {suma_procente}% (Corect!)")
+                        else:
+                            st.warning(f"⚠️ Suma procentelor: {suma_procente}% (Trebuie să fie 100%)")
+
+                        submitted_copro = st.form_submit_button("💾 Creează Co-proprietate", use_container_width=True)
+
+                        if submitted_copro:
+                            if not nume_copro.strip():
+                                st.error("❌ Numele imobilului este obligatoriu!")
+                            elif suma_procente != 100:
+                                st.error(f"❌ Suma procentelor trebuie să fie 100% (acum: {suma_procente}%)")
+                            else:
+                                proprietari_list = [
+                                    {"user_id": st.session_state.user_id, "procent": procent1},
+                                    {"user_id": user2_id, "procent": procent2}
+                                ]
+
+                                success, message, imobil_id = coproprietate.creaza_imobil_cu_proprietari(
+                                    supabase,
+                                    nume_copro.strip(),
+                                    adr_copro.strip() if adr_copro else None,
+                                    proprietari_list
+                                )
+
+                                if success:
+                                    st.success(f"✅ {message}")
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ {message}")
+                    else:
+                        st.warning("Nu există alți utilizatori activi în sistem pentru a crea co-proprietate.")
+                        submitted_copro = st.form_submit_button("💾 Creează Co-proprietate", use_container_width=True, disabled=True)
 
     # Listare imobile existente
     st.markdown("### 📋 Imobile Înregistrate")
@@ -505,37 +591,206 @@ elif page == "🏠 Gestiune Imobile":
         selected_user_filter = st.session_state.user_id
 
     try:
-        # Query cu sau fără filtrare
+        # Query cu sau fără filtrare - folosește tabelul de co-proprietate
         if selected_user_filter == "all":
-            res = supabase.table("imobile").select("*, users(nume, email)").order("created_at", desc=True).execute()
+            # Admini: toate imobilele
+            res = supabase.table("imobile").select("*").order("created_at", desc=True).execute()
+            imobile_lista = res.data if res.data else []
         else:
-            res = supabase.table("imobile").select("*, users(nume, email)").eq("user_id", selected_user_filter).order("created_at", desc=True).execute()
+            # User specific: doar imobilele la care are acces (inclusiv co-proprietăți)
+            imobile_data = coproprietate.get_imobile_user(supabase, selected_user_filter, include_shared=True)
+            # Extrage doar datele imobilului din structura de co-proprietate
+            imobile_lista = [item.get('imobile', item) if 'imobile' in item else item for item in imobile_data]
 
-        if not res.data:
+        if not imobile_lista:
             st.info("📭 Niciun imobil înregistrat încă.")
         else:
-            for imobil in res.data:
+            for imobil in imobile_lista:
+                # Preia toți co-proprietarii
+                coproprietari = coproprietate.get_coproprietari_imobil(supabase, imobil['id'])
+
                 with st.container():
                     col1, col2, col3 = st.columns([3, 2, 1])
+
                     with col1:
                         st.markdown(f"**{imobil['nume']}**")
                         if imobil.get('adresa'):
                             st.caption(f"📍 {imobil['adresa']}")
-                        # Afișează proprietarul pentru admini
-                        if auth.is_admin() and imobil.get('users'):
-                            st.caption(f"👤 Proprietar: {imobil['users']['nume']}")
+
+                        # Afișează toți co-proprietarii
+                        if coproprietari:
+                            if len(coproprietari) == 1:
+                                prop = coproprietari[0]
+                                if prop.get('users'):
+                                    st.caption(f"👤 Proprietar: {prop['users']['nume']} ({prop['procent_proprietate']}%)")
+                            else:
+                                st.caption("👥 Co-proprietari:")
+                                for prop in coproprietari:
+                                    if prop.get('users'):
+                                        icon = "👑" if prop['user_id'] == st.session_state.user_id else "👤"
+                                        st.caption(f"  {icon} {prop['users']['nume']}: {prop['procent_proprietate']}%")
+
                     with col2:
-                        st.metric("Cotă proprietate", f"{imobil['procent_proprietate']}%")
+                        # Afișare cotă totală
+                        cota_totala = coproprietate.get_procent_total_imobil(supabase, imobil['id'])
+                        color = "normal" if cota_totala == 100 else "off"
+                        st.metric("Cotă totală", f"{cota_totala}%")
+
+                        # Cotă utilizatorului curent
+                        if not auth.is_admin() or selected_user_filter != "all":
+                            cota_user = next((p['procent_proprietate'] for p in coproprietari
+                                            if p['user_id'] == (selected_user_filter if selected_user_filter != "all" else st.session_state.user_id)), 0)
+                            if cota_user > 0:
+                                st.caption(f"Tu: {cota_user}%")
+
                     with col3:
-                        # Adminii pot șterge orice, userii doar ale lor
-                        can_delete = auth.is_admin() or imobil.get('user_id') == st.session_state.user_id
-                        if can_delete and st.button("🗑️", key=f"del_imobil_{imobil['id']}", help="Șterge imobil"):
-                            try:
-                                supabase.table("imobile").delete().eq("id", imobil['id']).execute()
-                                st.success("✅ Imobil șters!")
+                        # Verificare permisiune de editare/ștergere
+                        can_edit = coproprietate.user_poate_edita_imobil(
+                            supabase,
+                            st.session_state.user_id,
+                            imobil['id'],
+                            auth.is_admin()
+                        )
+
+                        if can_edit:
+                            # Buton gestionare co-proprietari
+                            if st.button("⚙️", key=f"manage_{imobil['id']}", help="Gestionează co-proprietari"):
+                                st.session_state[f"managing_{imobil['id']}"] = True
                                 st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Eroare: {str(e)}")
+
+                            # Buton ștergere (doar dacă e ultimul proprietar sau admin)
+                            if auth.is_admin() or len(coproprietari) == 1:
+                                if st.button("🗑️", key=f"del_imobil_{imobil['id']}", help="Șterge imobil"):
+                                    try:
+                                        supabase.table("imobile").delete().eq("id", imobil['id']).execute()
+                                        st.success("✅ Imobil șters!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"❌ Eroare: {str(e)}")
+
+                    # Panel gestionare co-proprietari (extensibil)
+                    if st.session_state.get(f"managing_{imobil['id']}", False):
+                        with st.expander("⚙️ Gestionare Co-proprietari", expanded=True):
+                            tab_add, tab_edit, tab_remove = st.tabs(["➕ Adaugă", "✏️ Editează", "🗑️ Șterge"])
+
+                            with tab_add:
+                                st.markdown("#### Adaugă Co-proprietar Nou")
+
+                                # Selectare utilizator
+                                try:
+                                    all_users = supabase.table("users").select("id, nume, email").eq("active", True).execute()
+                                    # Exclude utilizatorii care sunt deja co-proprietari
+                                    existing_ids = [p['user_id'] for p in coproprietari]
+                                    available_users = [u for u in all_users.data if u['id'] not in existing_ids]
+
+                                    if available_users:
+                                        users_dict_add = {u['id']: f"{u['nume']} ({u['email']})" for u in available_users}
+
+                                        new_coprop_id = st.selectbox(
+                                            "Selectează utilizator:",
+                                            options=list(users_dict_add.keys()),
+                                            format_func=lambda x: users_dict_add[x],
+                                            key=f"add_user_{imobil['id']}"
+                                        )
+
+                                        new_procent = st.slider(
+                                            "Procent proprietate (%):",
+                                            0, 100, 25,
+                                            key=f"add_proc_{imobil['id']}"
+                                        )
+
+                                        cota_actuala = coproprietate.get_procent_total_imobil(supabase, imobil['id'])
+                                        cota_noua = cota_actuala + new_procent
+
+                                        if cota_noua > 100:
+                                            st.warning(f"⚠️ Suma va fi {cota_noua}% (depășește 100%)")
+
+                                        if st.button("➕ Adaugă Co-proprietar", key=f"btn_add_{imobil['id']}"):
+                                            success, msg = coproprietate.adauga_coproprietar_imobil(
+                                                supabase,
+                                                imobil['id'],
+                                                new_coprop_id,
+                                                new_procent
+                                            )
+
+                                            if success:
+                                                st.success(msg)
+                                                del st.session_state[f"managing_{imobil['id']}"]
+                                                st.rerun()
+                                            else:
+                                                st.error(msg)
+                                    else:
+                                        st.info("Nu există utilizatori disponibili pentru adăugare.")
+                                except Exception as e:
+                                    st.error(f"Eroare: {str(e)}")
+
+                            with tab_edit:
+                                st.markdown("#### Actualizează Procent Proprietate")
+
+                                if coproprietari:
+                                    coprop_to_edit = st.selectbox(
+                                        "Selectează co-proprietar:",
+                                        options=[p['user_id'] for p in coproprietari],
+                                        format_func=lambda x: next((p['users']['nume'] for p in coproprietari if p['user_id'] == x), "Unknown"),
+                                        key=f"edit_user_{imobil['id']}"
+                                    )
+
+                                    current_procent = next((p['procent_proprietate'] for p in coproprietari if p['user_id'] == coprop_to_edit), 0)
+
+                                    new_procent_edit = st.slider(
+                                        f"Procent nou (actual: {current_procent}%):",
+                                        0, 100, int(current_procent),
+                                        key=f"edit_proc_{imobil['id']}"
+                                    )
+
+                                    if st.button("💾 Salvează", key=f"btn_edit_{imobil['id']}"):
+                                        success, msg = coproprietate.actualizeaza_procent_coproprietar(
+                                            supabase,
+                                            imobil['id'],
+                                            coprop_to_edit,
+                                            new_procent_edit
+                                        )
+
+                                        if success:
+                                            st.success(msg)
+                                            del st.session_state[f"managing_{imobil['id']}"]
+                                            st.rerun()
+                                        else:
+                                            st.error(msg)
+
+                            with tab_remove:
+                                st.markdown("#### Șterge Co-proprietar")
+
+                                if len(coproprietari) > 1:
+                                    coprop_to_remove = st.selectbox(
+                                        "Selectează co-proprietar de șters:",
+                                        options=[p['user_id'] for p in coproprietari],
+                                        format_func=lambda x: next((p['users']['nume'] for p in coproprietari if p['user_id'] == x), "Unknown"),
+                                        key=f"remove_user_{imobil['id']}"
+                                    )
+
+                                    st.warning("⚠️ Ștergerea unui co-proprietar va șterge și accesul acestuia la toate contractele acestui imobil!")
+
+                                    if st.button("🗑️ Șterge Co-proprietar", key=f"btn_remove_{imobil['id']}", type="primary"):
+                                        success, msg = coproprietate.sterge_coproprietar_imobil(
+                                            supabase,
+                                            imobil['id'],
+                                            coprop_to_remove
+                                        )
+
+                                        if success:
+                                            st.success(msg)
+                                            del st.session_state[f"managing_{imobil['id']}"]
+                                            st.rerun()
+                                        else:
+                                            st.error(msg)
+                                else:
+                                    st.info("Nu poți șterge ultimul proprietar al imobilului.")
+
+                            if st.button("✖️ Închide", key=f"close_{imobil['id']}"):
+                                del st.session_state[f"managing_{imobil['id']}"]
+                                st.rerun()
+
                     st.divider()
     except Exception as e:
         st.error(f"❌ Eroare la încărcare: {str(e)}")
