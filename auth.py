@@ -35,6 +35,8 @@ def init_session_state():
         st.session_state.user_id = None
     if 'user_email' not in st.session_state:
         st.session_state.user_email = None
+    if 'user_name' not in st.session_state:
+        st.session_state.user_name = None
     if 'user_role' not in st.session_state:
         st.session_state.user_role = None
     if 'login_attempts' not in st.session_state:
@@ -92,6 +94,7 @@ def login_user(supabase: Client, email: str, password: str) -> tuple:
             st.session_state.authenticated = True
             st.session_state.user_id = user['id']
             st.session_state.user_email = user['email']
+            st.session_state.user_name = user.get('nume', user['email'])
             st.session_state.user_role = user.get('role', 'user')
 
             return True, "Autentificare reușită!", user
@@ -108,6 +111,7 @@ def logout_user():
     st.session_state.authenticated = False
     st.session_state.user_id = None
     st.session_state.user_email = None
+    st.session_state.user_name = None
     st.session_state.user_role = None
     st.session_state.login_attempts = 0
 

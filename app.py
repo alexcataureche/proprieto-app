@@ -653,6 +653,11 @@ elif page == "🏠 Gestiune Imobile":
                         )
 
                         if can_edit:
+                            # Buton editare imobil
+                            if st.button("✏️", key=f"edit_{imobil['id']}", help="Editează imobil"):
+                                st.session_state[f"editing_{imobil['id']}"] = True
+                                st.rerun()
+
                             # Buton gestionare co-proprietari
                             if st.button("⚙️", key=f"manage_{imobil['id']}", help="Gestionează co-proprietari"):
                                 st.session_state[f"managing_{imobil['id']}"] = True
@@ -667,6 +672,78 @@ elif page == "🏠 Gestiune Imobile":
                                         st.rerun()
                                     except Exception as e:
                                         st.error(f"❌ Eroare: {str(e)}")
+
+                    # Panel editare imobil
+                    if st.session_state.get(f"editing_{imobil['id']}", False):
+                        with st.expander("✏️ Editare Imobil", expanded=True):
+                            st.markdown("#### Modifică Datele Imobilului")
+
+                            with st.form(key=f"edit_form_{imobil['id']}"):
+                                edit_nume = st.text_input(
+                                    "Nume Imobil*",
+                                    value=imobil['nume'],
+                                    placeholder="ex: Apartament Centru",
+                                    key=f"edit_nume_{imobil['id']}"
+                                )
+
+                                edit_adresa = st.text_input(
+                                    "Adresă",
+                                    value=imobil.get('adresa', ''),
+                                    placeholder="ex: Str. Victoriei nr. 10, București",
+                                    key=f"edit_adresa_{imobil['id']}"
+                                )
+
+                                # Procent proprietate - doar pentru proprietari singuri
+                                if len(coproprietari) == 1:
+                                    edit_procent = st.slider(
+                                        "Procent proprietate (%)",
+                                        0, 100,
+                                        int(imobil.get('procent_proprietate', 100)),
+                                        key=f"edit_procent_{imobil['id']}"
+                                    )
+                                else:
+                                    st.info("💡 Pentru co-proprietăți, procentele se gestionează în tab-ul '⚙️ Gestionare Co-proprietari'")
+                                    edit_procent = imobil.get('procent_proprietate', 100)
+
+                                col_save, col_cancel = st.columns(2)
+
+                                with col_save:
+                                    submitted = st.form_submit_button("💾 Salvează", use_container_width=True, type="primary")
+
+                                with col_cancel:
+                                    cancel = st.form_submit_button("✖️ Anulează", use_container_width=True)
+
+                                if cancel:
+                                    del st.session_state[f"editing_{imobil['id']}"]
+                                    st.rerun()
+
+                                if submitted:
+                                    if not edit_nume.strip():
+                                        st.error("❌ Numele imobilului este obligatoriu!")
+                                    elif len(edit_nume) > 100:
+                                        st.error("❌ Numele este prea lung (max 100 caractere)")
+                                    else:
+                                        try:
+                                            # Actualizează imobilul
+                                            update_data = {
+                                                "nume": edit_nume.strip(),
+                                                "adresa": edit_adresa.strip() if edit_adresa else None,
+                                                "procent_proprietate": edit_procent
+                                            }
+
+                                            supabase.table("imobile").update(update_data).eq("id", imobil['id']).execute()
+
+                                            # Dacă e proprietar singular, actualizează și în tabelul de co-proprietari
+                                            if len(coproprietari) == 1:
+                                                supabase.table("imobile_proprietari").update({
+                                                    "procent_proprietate": edit_procent
+                                                }).eq("imobil_id", imobil['id']).eq("user_id", st.session_state.user_id).execute()
+
+                                            st.success(f"✅ Imobilul '{edit_nume}' a fost actualizat!")
+                                            del st.session_state[f"editing_{imobil['id']}"]
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"❌ Eroare la actualizare: {str(e)}")
 
                     # Panel gestionare co-proprietari (extensibil)
                     if st.session_state.get(f"managing_{imobil['id']}", False):
@@ -799,18 +876,25 @@ elif page == "🏠 Gestiune Imobile":
 elif page == "📄 Gestiune Contracte":
     st.title("📄 Gestiune Contracte de Închiriere")
 
-    # Verificare existență imobile (doar ale utilizatorului curent)
+    # Verificare existență imobile (inclusiv co-proprietăți)
     try:
-        res_imobile = supabase.table("imobile").select("id, nume").eq("user_id", st.session_state.user_id).execute()
+        imobile_data = coproprietate.get_imobile_user(supabase, st.session_state.user_id, include_shared=True)
+        # Extrage datele imobilului din structura de co-proprietate
+        imobile_lista = []
+        for item in imobile_data:
+            if 'imobile' in item and item['imobile']:
+                imobile_lista.append(item['imobile'])
+            elif 'id' in item:  # Fallback pentru imobile simple
+                imobile_lista.append(item)
 
-        if not res_imobile.data:
+        if not imobile_lista:
             st.warning("⚠️ Trebuie să adaugi mai întâi un imobil în secțiunea **Gestiune Imobile**.")
         else:
             # Formular adăugare contract
             with st.expander("➕ Adaugă Contract Nou", expanded=True):
                 with st.form("contract_form"):
                     # Selectare imobil
-                    imobile_dict = {i['id']: i['nume'] for i in res_imobile.data}
+                    imobile_dict = {i['id']: i['nume'] for i in imobile_lista}
                     imobil_selectat = st.selectbox(
                         "Imobil*",
                         options=list(imobile_dict.keys()),
@@ -926,15 +1010,163 @@ elif page == "📄 Gestiune Contracte":
                             with col4:
                                 if contract.get('pdf_url'):
                                     st.link_button("📄", contract['pdf_url'], help="Vezi contract")
+
+                                # Adminii pot edita orice, userii doar ale lor
+                                can_edit_c = auth.is_admin() or contract.get('user_id') == st.session_state.user_id
+                                if can_edit_c:
+                                    if st.button("✏️", key=f"edit_contract_{contract['id']}", help="Editează contract"):
+                                        st.session_state[f"editing_contract_{contract['id']}"] = True
+                                        st.rerun()
+
                                 # Adminii pot șterge orice, userii doar ale lor
                                 can_delete_c = auth.is_admin() or contract.get('user_id') == st.session_state.user_id
-                                if can_delete_c and st.button("🗑️", key=f"del_contract_{contract['id']}", help="Șterge contract"):
-                                    try:
-                                        supabase.table("contracte").delete().eq("id", contract['id']).execute()
-                                        st.success("✅ Contract șters!")
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"❌ {str(e)}")
+                                if can_delete_c:
+                                    if st.button("🗑️", key=f"del_contract_{contract['id']}", help="Șterge contract"):
+                                        try:
+                                            supabase.table("contracte").delete().eq("id", contract['id']).execute()
+                                            st.success("✅ Contract șters!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"❌ {str(e)}")
+
+                            # Panel editare contract
+                            if st.session_state.get(f"editing_contract_{contract['id']}", False):
+                                with st.expander("✏️ Editare Contract", expanded=True):
+                                    st.markdown("#### Modifică Datele Contractului")
+
+                                    with st.form(key=f"edit_contract_form_{contract['id']}"):
+                                        # Selectare imobil (doar imobilele utilizatorului)
+                                        user_imobile_data = coproprietate.get_imobile_user(supabase, st.session_state.user_id, include_shared=True)
+                                        user_imobile_lista = []
+                                        for item in user_imobile_data:
+                                            if 'imobile' in item and item['imobile']:
+                                                user_imobile_lista.append(item['imobile'])
+                                            elif 'id' in item:
+                                                user_imobile_lista.append(item)
+
+                                        if user_imobile_lista:
+                                            imobile_dict_edit = {i['id']: i['nume'] for i in user_imobile_lista}
+                                            current_imobil_idx = list(imobile_dict_edit.keys()).index(contract['imobil_id']) if contract['imobil_id'] in imobile_dict_edit else 0
+
+                                            edit_imobil = st.selectbox(
+                                                "Imobil*",
+                                                options=list(imobile_dict_edit.keys()),
+                                                index=current_imobil_idx,
+                                                format_func=lambda x: imobile_dict_edit[x],
+                                                key=f"edit_imobil_{contract['id']}"
+                                            )
+
+                                            col1_e, col2_e = st.columns(2)
+                                            with col1_e:
+                                                edit_nr_contract = st.text_input(
+                                                    "Nr. Contract",
+                                                    value=contract.get('nr_contract', ''),
+                                                    placeholder="ex: C-2026-001",
+                                                    key=f"edit_nr_{contract['id']}"
+                                                )
+                                                edit_locatar = st.text_input(
+                                                    "Nume Locatar*",
+                                                    value=contract['locatar'],
+                                                    placeholder="ex: Popescu Ion",
+                                                    key=f"edit_locatar_{contract['id']}"
+                                                )
+                                            with col2_e:
+                                                edit_cnp_cui = st.text_input(
+                                                    "CNP/CUI",
+                                                    value=contract.get('cnp_cui', ''),
+                                                    placeholder="13 cifre pentru PF, 2-10 pentru PJ",
+                                                    key=f"edit_cnp_{contract['id']}"
+                                                )
+                                                edit_pdf_url = st.text_input(
+                                                    "Link Contract PDF (opțional)",
+                                                    value=contract.get('pdf_url', ''),
+                                                    placeholder="https://...",
+                                                    key=f"edit_pdf_{contract['id']}"
+                                                )
+
+                                            col3_e, col4_e = st.columns(2)
+                                            with col3_e:
+                                                edit_chirie = st.number_input(
+                                                    "Chirie Lunară*",
+                                                    min_value=0.0,
+                                                    value=float(contract['chirie_lunara']),
+                                                    step=50.0,
+                                                    key=f"edit_chirie_{contract['id']}"
+                                                )
+                                                moneda_idx = 0 if contract['moneda'] == 'RON' else 1
+                                                edit_moneda = st.selectbox(
+                                                    "Monedă",
+                                                    ["RON", "EUR"],
+                                                    index=moneda_idx,
+                                                    key=f"edit_moneda_{contract['id']}"
+                                                )
+                                            with col4_e:
+                                                edit_data_start = st.date_input(
+                                                    "Data Început*",
+                                                    value=datetime.datetime.strptime(contract['data_inceput'], '%Y-%m-%d').date(),
+                                                    key=f"edit_start_{contract['id']}"
+                                                )
+                                                current_data_end = datetime.datetime.strptime(contract['data_sfarsit'], '%Y-%m-%d').date() if contract.get('data_sfarsit') else None
+                                                edit_data_end = st.date_input(
+                                                    "Data Sfârșit",
+                                                    value=current_data_end,
+                                                    help="Lasă gol pentru contract pe durată nedeterminată",
+                                                    key=f"edit_end_{contract['id']}"
+                                                )
+
+                                            col_save_c, col_cancel_c = st.columns(2)
+
+                                            with col_save_c:
+                                                submitted_edit = st.form_submit_button("💾 Salvează", use_container_width=True, type="primary")
+
+                                            with col_cancel_c:
+                                                cancel_edit = st.form_submit_button("✖️ Anulează", use_container_width=True)
+
+                                            if cancel_edit:
+                                                del st.session_state[f"editing_contract_{contract['id']}"]
+                                                st.rerun()
+
+                                            if submitted_edit:
+                                                erori_edit = []
+
+                                                if not edit_locatar.strip():
+                                                    erori_edit.append("Numele locatarului este obligatoriu")
+                                                if edit_chirie <= 0:
+                                                    erori_edit.append("Chiria trebuie să fie > 0")
+                                                if edit_cnp_cui and not valideaza_cnp_cui(edit_cnp_cui):
+                                                    erori_edit.append("CNP/CUI invalid (doar cifre, lungime 6-13)")
+                                                if edit_data_end and edit_data_end < edit_data_start:
+                                                    erori_edit.append("Data sfârșit nu poate fi înainte de data început")
+
+                                                if erori_edit:
+                                                    for err in erori_edit:
+                                                        st.error(f"❌ {err}")
+                                                else:
+                                                    try:
+                                                        update_contract_data = {
+                                                            "imobil_id": edit_imobil,
+                                                            "nr_contract": edit_nr_contract.strip() if edit_nr_contract else None,
+                                                            "locatar": edit_locatar.strip(),
+                                                            "cnp_cui": edit_cnp_cui.strip() if edit_cnp_cui else None,
+                                                            "chirie_lunara": edit_chirie,
+                                                            "moneda": edit_moneda,
+                                                            "data_inceput": edit_data_start.isoformat(),
+                                                            "data_sfarsit": edit_data_end.isoformat() if edit_data_end else None,
+                                                            "pdf_url": edit_pdf_url.strip() if edit_pdf_url else None
+                                                        }
+
+                                                        supabase.table("contracte").update(update_contract_data).eq("id", contract['id']).execute()
+
+                                                        st.success(f"✅ Contractul pentru '{edit_locatar}' a fost actualizat!")
+                                                        del st.session_state[f"editing_contract_{contract['id']}"]
+                                                        st.rerun()
+                                                    except Exception as e:
+                                                        st.error(f"❌ Eroare la actualizare: {str(e)}")
+                                        else:
+                                            st.warning("⚠️ Nu ai imobile înregistrate pentru a edita acest contract.")
+                                            if st.form_submit_button("✖️ Închide"):
+                                                del st.session_state[f"editing_contract_{contract['id']}"]
+                                                st.rerun()
 
                             st.divider()
             except Exception as e:
