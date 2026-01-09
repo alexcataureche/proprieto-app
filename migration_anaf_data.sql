@@ -263,9 +263,9 @@ SELECT
         ELSE c.chirie_lunara * 12
     END AS venit_anual_brut,
 
-    -- Date sistem
-    c.created_at,
-    c.updated_at
+    -- Date sistem (folosim created_at din users și imobile dacă există)
+    i.created_at AS imobil_created_at,
+    i.updated_at AS imobil_updated_at
 
 FROM contracte c
 JOIN users u ON c.user_id = u.id
