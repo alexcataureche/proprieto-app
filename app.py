@@ -7,6 +7,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 import auth  # Modul de autentificare
 import coproprietate  # Modul de co-proprietate
+import validari  # Modul de validări CNP, CUI, etc.
 
 # --- CONFIGURARE ---
 st.set_page_config(
@@ -522,43 +523,197 @@ if page == "👤 Cont":
     with tab2:
         st.subheader("✏️ Editează Profil")
 
-        st.markdown("#### Informații Personale")
+        st.markdown("#### Informații Personale pentru ANAF D212")
+        st.info("📋 Completează toate datele pentru declarația către ANAF. CNP-ul și telefonul sunt obligatorii.")
+
+        # Încarcă datele curente ale utilizatorului
+        try:
+            user_data = supabase.table("users").select("*").eq("id", st.session_state.user_id).execute()
+            current_user = user_data.data[0] if user_data.data else {}
+        except:
+            current_user = {}
 
         with st.form("edit_profile_form"):
-            current_name = st.session_state.get('user_name', st.session_state.user_email)
+            # Secțiunea 1: Date de Identificare
+            st.markdown("##### 📝 Date de Identificare")
 
-            new_name = st.text_input(
-                "Nume Complet",
-                value=current_name,
-                placeholder="ex: Popescu Ion",
-                help="Numele afișat în aplicație"
+            col1, col2 = st.columns(2)
+            with col1:
+                new_name = st.text_input(
+                    "Nume Complet*",
+                    value=current_user.get('nume', st.session_state.get('user_name', '')),
+                    placeholder="ex: Popescu Ion",
+                    help="Numele complet exact ca în CI/Pașaport"
+                )
+            with col2:
+                cnp = st.text_input(
+                    "CNP / NIF*",
+                    value=current_user.get('cnp', ''),
+                    placeholder="ex: 1850203123456",
+                    max_chars=13,
+                    help="Cod Numeric Personal (13 cifre) sau NIF pentru străini"
+                )
+
+            telefon = st.text_input(
+                "Telefon*",
+                value=current_user.get('telefon', ''),
+                placeholder="ex: 0722123456 sau +40722123456",
+                help="Număr de telefon pentru contact cu ANAF"
             )
 
-            st.caption("📧 Email-ul nu poate fi modificat pentru securitate")
+            st.caption("📧 Email: " + st.session_state.user_email + " (nu poate fi modificat)")
+
+            # Secțiunea 2: Adresa de Domiciliu
+            st.markdown("##### 🏠 Adresa de Domiciliu")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                judet = st.selectbox(
+                    "Județ*",
+                    options=[""] + validari.JUDETE_ROMANIA,
+                    index=0 if not current_user.get('judet') else validari.JUDETE_ROMANIA.index(current_user.get('judet')) + 1 if current_user.get('judet') in validari.JUDETE_ROMANIA else 0,
+                    help="Selectează județul de domiciliu"
+                )
+            with col2:
+                localitate = st.text_input(
+                    "Localitate*",
+                    value=current_user.get('localitate', ''),
+                    placeholder="ex: București, Cluj-Napoca",
+                    help="Oraș/Comună de domiciliu"
+                )
+
+            col1, col2, col3 = st.columns([3, 1, 1])
+            with col1:
+                strada = st.text_input(
+                    "Strada*",
+                    value=current_user.get('strada', ''),
+                    placeholder="ex: Victoriei",
+                    help="Numele străzii (fără 'Str.')"
+                )
+            with col2:
+                numar = st.text_input(
+                    "Număr*",
+                    value=current_user.get('numar', ''),
+                    placeholder="ex: 10",
+                    help="Numărul străzii"
+                )
+            with col3:
+                bloc = st.text_input(
+                    "Bloc",
+                    value=current_user.get('bloc', ''),
+                    placeholder="ex: A1",
+                    help="Blocul (opțional)"
+                )
+
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                scara = st.text_input(
+                    "Scară",
+                    value=current_user.get('scara', ''),
+                    placeholder="ex: A",
+                    help="Scara (opțional)"
+                )
+            with col2:
+                etaj = st.text_input(
+                    "Etaj",
+                    value=current_user.get('etaj', ''),
+                    placeholder="ex: 3",
+                    help="Etajul (opțional)"
+                )
+            with col3:
+                apartament = st.text_input(
+                    "Apartament",
+                    value=current_user.get('apartament', ''),
+                    placeholder="ex: 15",
+                    help="Numărul apartamentului (opțional)"
+                )
+            with col4:
+                cod_postal = st.text_input(
+                    "Cod Poștal",
+                    value=current_user.get('cod_postal', ''),
+                    placeholder="ex: 010101",
+                    max_chars=6,
+                    help="Codul poștal (opțional, 6 cifre)"
+                )
+
+            # Preview adresă
+            adresa_preview = validari.formateaza_adresa_completa(
+                judet, localitate, strada, numar, bloc, scara, etaj, apartament, cod_postal
+            )
+            if adresa_preview:
+                st.caption("📍 **Preview adresă:** " + adresa_preview)
+
+            st.markdown("---")
 
             col_save, col_cancel = st.columns(2)
-
             with col_save:
-                submitted_profile = st.form_submit_button("💾 Salvează", use_container_width=True, type="primary")
+                submitted_profile = st.form_submit_button("💾 Salvează Profil", use_container_width=True, type="primary")
 
             if submitted_profile:
+                # Validări
+                errors = []
+
                 if not new_name.strip():
-                    st.error("❌ Numele nu poate fi gol!")
+                    errors.append("❌ Numele complet este obligatoriu")
                 elif len(new_name.strip()) < 3:
-                    st.error("❌ Numele trebuie să aibă minim 3 caractere!")
-                elif len(new_name.strip()) > 100:
-                    st.error("❌ Numele este prea lung (max 100 caractere)")
+                    errors.append("❌ Numele trebuie să aibă minim 3 caractere")
+
+                if cnp.strip():
+                    is_valid, error_msg = validari.valideaza_cnp(cnp)
+                    if not is_valid:
+                        errors.append(f"❌ CNP invalid: {error_msg}")
+                else:
+                    errors.append("❌ CNP-ul este obligatoriu pentru declarația ANAF")
+
+                if telefon.strip():
+                    is_valid, error_msg = validari.valideaza_telefon(telefon)
+                    if not is_valid:
+                        errors.append(f"❌ Telefon invalid: {error_msg}")
+                else:
+                    errors.append("❌ Telefonul este obligatoriu pentru declarația ANAF")
+
+                if not judet:
+                    errors.append("❌ Județul este obligatoriu")
+
+                if not localitate.strip():
+                    errors.append("❌ Localitatea este obligatorie")
+
+                if not strada.strip():
+                    errors.append("❌ Strada este obligatorie")
+
+                if not numar.strip():
+                    errors.append("❌ Numărul este obligatoriu")
+
+                if cod_postal.strip():
+                    is_valid, error_msg = validari.valideaza_cod_postal(cod_postal)
+                    if not is_valid:
+                        errors.append(f"❌ Cod poștal invalid: {error_msg}")
+
+                if errors:
+                    for error in errors:
+                        st.error(error)
                 else:
                     try:
-                        # Actualizează numele în baza de date
+                        # Actualizează datele în baza de date
                         supabase.table("users").update({
-                            "nume": new_name.strip()
+                            "nume": new_name.strip(),
+                            "cnp": cnp.strip(),
+                            "telefon": telefon.strip(),
+                            "judet": judet,
+                            "localitate": localitate.strip(),
+                            "strada": strada.strip(),
+                            "numar": numar.strip(),
+                            "bloc": bloc.strip() if bloc.strip() else None,
+                            "scara": scara.strip() if scara.strip() else None,
+                            "etaj": etaj.strip() if etaj.strip() else None,
+                            "apartament": apartament.strip() if apartament.strip() else None,
+                            "cod_postal": cod_postal.strip() if cod_postal.strip() else None
                         }).eq("id", st.session_state.user_id).execute()
 
                         # Actualizează session state
                         st.session_state.user_name = new_name.strip()
 
-                        st.success(f"✅ Profil actualizat cu succes!")
+                        st.success(f"✅ Profil actualizat cu succes! Datele sunt pregătite pentru declarația ANAF.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ Eroare la actualizare: {str(e)}")
@@ -855,27 +1010,96 @@ elif page == "🏠 Gestiune Imobile":
         with tab1:
             # Formular clasic - un singur proprietar
             with st.form("imobil_form_single"):
+                nume = st.text_input("Nume Identificare*", placeholder="ex: Apartament Centru", help="Nume descriptiv pentru imobil")
+
+                # Adresă detaliată
+                st.markdown("##### 🏠 Adresa Imobilului")
+
                 col1, col2 = st.columns(2)
                 with col1:
-                    nume = st.text_input("Nume Identificare*", placeholder="ex: Apartament Centru")
+                    judet_im = st.selectbox("Județ*", options=[""] + validari.JUDETE_ROMANIA, key="judet_im_single")
                 with col2:
-                    adr = st.text_input("Adresă Completă", placeholder="ex: Str. Victoriei nr. 10, București")
+                    localitate_im = st.text_input("Localitate*", placeholder="ex: București", key="loc_im_single")
 
-                proc = st.slider("Procent Proprietate (%)", 0, 100, 100, help="Cotă de proprietate deținută")
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    strada_im = st.text_input("Strada*", placeholder="ex: Victoriei", key="str_im_single")
+                with col2:
+                    numar_im = st.text_input("Număr*", placeholder="ex: 10", key="nr_im_single")
+                with col3:
+                    bloc_im = st.text_input("Bloc", placeholder="ex: A1", key="bl_im_single")
+
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    scara_im = st.text_input("Scară", placeholder="ex: A", key="sc_im_single")
+                with col2:
+                    etaj_im = st.text_input("Etaj", placeholder="ex: 3", key="et_im_single")
+                with col3:
+                    apartament_im = st.text_input("Apartament", placeholder="ex: 15", key="ap_im_single")
+                with col4:
+                    cod_postal_im = st.text_input("Cod Poștal", placeholder="ex: 010101", max_chars=6, key="cp_im_single")
+
+                # Preview adresă
+                adresa_preview_im = validari.formateaza_adresa_completa(
+                    judet_im, localitate_im, strada_im, numar_im, bloc_im, scara_im, etaj_im, apartament_im, cod_postal_im
+                )
+                if adresa_preview_im:
+                    st.caption("📍 **Preview:** " + adresa_preview_im)
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    numar_camere_im = st.number_input("Număr Camere*", min_value=1, max_value=20, value=2, key="cam_im_single", help="Numărul total de camere")
+                with col2:
+                    proc = st.slider("Procent Proprietate (%)", 0, 100, 100, help="Cotă de proprietate deținută", key="proc_single")
 
                 submitted = st.form_submit_button("💾 Salvează Imobil", use_container_width=True)
 
                 if submitted:
+                    errors = []
+
                     if not nume.strip():
-                        st.error("❌ Numele imobilului este obligatoriu!")
+                        errors.append("❌ Numele imobilului este obligatoriu")
                     elif len(nume) > 100:
-                        st.error("❌ Numele este prea lung (max 100 caractere)")
+                        errors.append("❌ Numele este prea lung (max 100 caractere)")
+
+                    if not judet_im:
+                        errors.append("❌ Județul este obligatoriu")
+                    if not localitate_im.strip():
+                        errors.append("❌ Localitatea este obligatorie")
+                    if not strada_im.strip():
+                        errors.append("❌ Strada este obligatorie")
+                    if not numar_im.strip():
+                        errors.append("❌ Numărul este obligatoriu")
+
+                    if cod_postal_im.strip():
+                        is_valid, error_msg = validari.valideaza_cod_postal(cod_postal_im)
+                        if not is_valid:
+                            errors.append(f"❌ {error_msg}")
+
+                    if errors:
+                        for error in errors:
+                            st.error(error)
                     else:
                         try:
+                            # Formează adresa completă pentru câmpul legacy
+                            adresa_completa = validari.formateaza_adresa_completa(
+                                judet_im, localitate_im, strada_im, numar_im, bloc_im, scara_im, etaj_im, apartament_im, cod_postal_im
+                            )
+
                             # Creează imobilul
                             result = supabase.table("imobile").insert({
                                 "nume": nume.strip(),
-                                "adresa": adr.strip() if adr else None,
+                                "adresa": adresa_completa,  # Câmp legacy pentru compatibilitate
+                                "judet": judet_im,
+                                "localitate": localitate_im.strip(),
+                                "strada": strada_im.strip(),
+                                "numar": numar_im.strip(),
+                                "bloc": bloc_im.strip() if bloc_im.strip() else None,
+                                "scara": scara_im.strip() if scara_im.strip() else None,
+                                "etaj": etaj_im.strip() if etaj_im.strip() else None,
+                                "apartament": apartament_im.strip() if apartament_im.strip() else None,
+                                "cod_postal": cod_postal_im.strip() if cod_postal_im.strip() else None,
+                                "numar_camere": numar_camere_im,
                                 "procent_proprietate": proc,
                                 "user_id": st.session_state.user_id
                             }).execute()
@@ -889,7 +1113,7 @@ elif page == "🏠 Gestiune Imobile":
                                     "procent_proprietate": proc
                                 }).execute()
 
-                            st.success(f"✅ Imobil '{nume}' a fost înregistrat!")
+                            st.success(f"✅ Imobil '{nume}' a fost înregistrat cu succes!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"❌ Eroare la salvare: {str(e)}")
@@ -899,11 +1123,43 @@ elif page == "🏠 Gestiune Imobile":
             st.info("💡 Creează un imobil cu multipli co-proprietari. Suma procentelor trebuie să fie 100%.")
 
             with st.form("imobil_form_copro"):
+                nume_copro = st.text_input("Nume Identificare*", placeholder="ex: Apartament Centru", key="nume_copro", help="Nume descriptiv pentru imobil")
+
+                # Adresă detaliată
+                st.markdown("##### 🏠 Adresa Imobilului")
+
                 col1, col2 = st.columns(2)
                 with col1:
-                    nume_copro = st.text_input("Nume Identificare*", placeholder="ex: Apartament Centru", key="nume_copro")
+                    judet_copro = st.selectbox("Județ*", options=[""] + validari.JUDETE_ROMANIA, key="judet_copro")
                 with col2:
-                    adr_copro = st.text_input("Adresă Completă", placeholder="ex: Str. Victoriei nr. 10, București", key="adr_copro")
+                    localitate_copro = st.text_input("Localitate*", placeholder="ex: București", key="loc_copro")
+
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    strada_copro = st.text_input("Strada*", placeholder="ex: Victoriei", key="str_copro")
+                with col2:
+                    numar_copro = st.text_input("Număr*", placeholder="ex: 10", key="nr_copro")
+                with col3:
+                    bloc_copro = st.text_input("Bloc", placeholder="ex: A1", key="bl_copro")
+
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    scara_copro = st.text_input("Scară", placeholder="ex: A", key="sc_copro")
+                with col2:
+                    etaj_copro = st.text_input("Etaj", placeholder="ex: 3", key="et_copro")
+                with col3:
+                    apartament_copro = st.text_input("Apartament", placeholder="ex: 15", key="ap_copro")
+                with col4:
+                    cod_postal_copro = st.text_input("Cod Poștal", placeholder="ex: 010101", max_chars=6, key="cp_copro")
+
+                # Preview adresă
+                adresa_preview_copro = validari.formateaza_adresa_completa(
+                    judet_copro, localitate_copro, strada_copro, numar_copro, bloc_copro, scara_copro, etaj_copro, apartament_copro, cod_postal_copro
+                )
+                if adresa_preview_copro:
+                    st.caption("📍 **Preview:** " + adresa_preview_copro)
+
+                numar_camere_copro = st.number_input("Număr Camere*", min_value=1, max_value=20, value=2, key="cam_copro", help="Numărul total de camere")
 
                 st.markdown("### 👥 Co-proprietari")
 
@@ -939,28 +1195,78 @@ elif page == "🏠 Gestiune Imobile":
                         submitted_copro = st.form_submit_button("💾 Creează Co-proprietate", use_container_width=True)
 
                         if submitted_copro:
+                            errors = []
+
                             if not nume_copro.strip():
-                                st.error("❌ Numele imobilului este obligatoriu!")
-                            elif suma_procente != 100:
-                                st.error(f"❌ Suma procentelor trebuie să fie 100% (acum: {suma_procente}%)")
+                                errors.append("❌ Numele imobilului este obligatoriu")
+
+                            if suma_procente != 100:
+                                errors.append(f"❌ Suma procentelor trebuie să fie 100% (acum: {suma_procente}%)")
+
+                            if not judet_copro:
+                                errors.append("❌ Județul este obligatoriu")
+                            if not localitate_copro.strip():
+                                errors.append("❌ Localitatea este obligatorie")
+                            if not strada_copro.strip():
+                                errors.append("❌ Strada este obligatorie")
+                            if not numar_copro.strip():
+                                errors.append("❌ Numărul este obligatoriu")
+
+                            if cod_postal_copro.strip():
+                                is_valid, error_msg = validari.valideaza_cod_postal(cod_postal_copro)
+                                if not is_valid:
+                                    errors.append(f"❌ {error_msg}")
+
+                            if errors:
+                                for error in errors:
+                                    st.error(error)
                             else:
-                                proprietari_list = [
-                                    {"user_id": st.session_state.user_id, "procent": procent1},
-                                    {"user_id": user2_id, "procent": procent2}
-                                ]
+                                try:
+                                    # Formează adresa completă
+                                    adresa_completa = validari.formateaza_adresa_completa(
+                                        judet_copro, localitate_copro, strada_copro, numar_copro, bloc_copro, scara_copro, etaj_copro, apartament_copro, cod_postal_copro
+                                    )
 
-                                success, message, imobil_id = coproprietate.creaza_imobil_cu_proprietari(
-                                    supabase,
-                                    nume_copro.strip(),
-                                    adr_copro.strip() if adr_copro else None,
-                                    proprietari_list
-                                )
+                                    # Creează imobilul cu datele noi
+                                    result = supabase.table("imobile").insert({
+                                        "nume": nume_copro.strip(),
+                                        "adresa": adresa_completa,  # Câmp legacy
+                                        "judet": judet_copro,
+                                        "localitate": localitate_copro.strip(),
+                                        "strada": strada_copro.strip(),
+                                        "numar": numar_copro.strip(),
+                                        "bloc": bloc_copro.strip() if bloc_copro.strip() else None,
+                                        "scara": scara_copro.strip() if scara_copro.strip() else None,
+                                        "etaj": etaj_copro.strip() if etaj_copro.strip() else None,
+                                        "apartament": apartament_copro.strip() if apartament_copro.strip() else None,
+                                        "cod_postal": cod_postal_copro.strip() if cod_postal_copro.strip() else None,
+                                        "numar_camere": numar_camere_copro,
+                                        "procent_proprietate": 100,
+                                        "user_id": st.session_state.user_id
+                                    }).execute()
 
-                                if success:
-                                    st.success(f"✅ {message}")
-                                    st.rerun()
-                                else:
-                                    st.error(f"❌ {message}")
+                                    if result.data:
+                                        imobil_id = result.data[0]['id']
+
+                                        # Adaugă ambii proprietari
+                                        proprietari_data = [
+                                            {
+                                                "imobil_id": imobil_id,
+                                                "user_id": st.session_state.user_id,
+                                                "procent_proprietate": procent1
+                                            },
+                                            {
+                                                "imobil_id": imobil_id,
+                                                "user_id": user2_id,
+                                                "procent_proprietate": procent2
+                                            }
+                                        ]
+                                        supabase.table("imobile_proprietari").insert(proprietari_data).execute()
+
+                                        st.success(f"✅ Co-proprietate '{nume_copro}' creată cu succes!")
+                                        st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Eroare la creare: {str(e)}")
                     else:
                         st.warning("Nu există alți utilizatori activi în sistem pentru a crea co-proprietate.")
                         submitted_copro = st.form_submit_button("💾 Creează Co-proprietate", use_container_width=True, disabled=True)
@@ -1083,24 +1389,108 @@ elif page == "🏠 Gestiune Imobile":
                                     key=f"edit_nume_{imobil['id']}"
                                 )
 
-                                edit_adresa = st.text_input(
-                                    "Adresă",
-                                    value=imobil.get('adresa', ''),
-                                    placeholder="ex: Str. Victoriei nr. 10, București",
-                                    key=f"edit_adresa_{imobil['id']}"
-                                )
+                                # Adresă detaliată
+                                st.markdown("##### 🏠 Adresa Imobilului")
 
-                                # Procent proprietate - doar pentru proprietari singuri
-                                if len(coproprietari) == 1:
-                                    edit_procent = st.slider(
-                                        "Procent proprietate (%)",
-                                        0, 100,
-                                        int(imobil.get('procent_proprietate', 100)),
-                                        key=f"edit_procent_{imobil['id']}"
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    edit_judet = st.selectbox(
+                                        "Județ*",
+                                        options=[""] + validari.JUDETE_ROMANIA,
+                                        index=0 if not imobil.get('judet') else validari.JUDETE_ROMANIA.index(imobil.get('judet')) + 1 if imobil.get('judet') in validari.JUDETE_ROMANIA else 0,
+                                        key=f"edit_judet_{imobil['id']}"
                                     )
-                                else:
-                                    st.info("💡 Pentru co-proprietăți, procentele se gestionează în tab-ul '⚙️ Gestionare Co-proprietari'")
-                                    edit_procent = imobil.get('procent_proprietate', 100)
+                                with col2:
+                                    edit_localitate = st.text_input(
+                                        "Localitate*",
+                                        value=imobil.get('localitate', ''),
+                                        placeholder="ex: București",
+                                        key=f"edit_localitate_{imobil['id']}"
+                                    )
+
+                                col1, col2, col3 = st.columns([3, 1, 1])
+                                with col1:
+                                    edit_strada = st.text_input(
+                                        "Strada*",
+                                        value=imobil.get('strada', ''),
+                                        placeholder="ex: Victoriei",
+                                        key=f"edit_strada_{imobil['id']}"
+                                    )
+                                with col2:
+                                    edit_numar = st.text_input(
+                                        "Număr*",
+                                        value=imobil.get('numar', ''),
+                                        placeholder="ex: 10",
+                                        key=f"edit_numar_{imobil['id']}"
+                                    )
+                                with col3:
+                                    edit_bloc = st.text_input(
+                                        "Bloc",
+                                        value=imobil.get('bloc', '') if imobil.get('bloc') else '',
+                                        placeholder="ex: A1",
+                                        key=f"edit_bloc_{imobil['id']}"
+                                    )
+
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    edit_scara = st.text_input(
+                                        "Scară",
+                                        value=imobil.get('scara', '') if imobil.get('scara') else '',
+                                        placeholder="ex: A",
+                                        key=f"edit_scara_{imobil['id']}"
+                                    )
+                                with col2:
+                                    edit_etaj = st.text_input(
+                                        "Etaj",
+                                        value=imobil.get('etaj', '') if imobil.get('etaj') else '',
+                                        placeholder="ex: 3",
+                                        key=f"edit_etaj_{imobil['id']}"
+                                    )
+                                with col3:
+                                    edit_apartament = st.text_input(
+                                        "Apartament",
+                                        value=imobil.get('apartament', '') if imobil.get('apartament') else '',
+                                        placeholder="ex: 15",
+                                        key=f"edit_apartament_{imobil['id']}"
+                                    )
+                                with col4:
+                                    edit_cod_postal = st.text_input(
+                                        "Cod Poștal",
+                                        value=imobil.get('cod_postal', '') if imobil.get('cod_postal') else '',
+                                        placeholder="ex: 010101",
+                                        max_chars=6,
+                                        key=f"edit_cod_postal_{imobil['id']}"
+                                    )
+
+                                # Preview adresă
+                                adresa_preview = validari.formateaza_adresa_completa(
+                                    edit_judet, edit_localitate, edit_strada, edit_numar,
+                                    edit_bloc, edit_scara, edit_etaj, edit_apartament, edit_cod_postal
+                                )
+                                if adresa_preview:
+                                    st.caption("📍 **Preview:** " + adresa_preview)
+
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    edit_numar_camere = st.number_input(
+                                        "Număr Camere*",
+                                        min_value=1,
+                                        max_value=20,
+                                        value=int(imobil.get('numar_camere', 2)),
+                                        key=f"edit_camere_{imobil['id']}"
+                                    )
+                                with col2:
+                                    # Procent proprietate - doar pentru proprietari singuri
+                                    if len(coproprietari) == 1:
+                                        edit_procent = st.slider(
+                                            "Procent proprietate (%)",
+                                            0, 100,
+                                            int(imobil.get('procent_proprietate', 100)),
+                                            key=f"edit_procent_{imobil['id']}"
+                                        )
+                                    else:
+                                        st.info("💡 Pentru co-proprietăți, procentele se gestionează în tab-ul '⚙️ Gestionare Co-proprietari'")
+                                        edit_procent = imobil.get('procent_proprietate', 100)
 
                                 col_save, col_cancel = st.columns(2)
 
@@ -1115,16 +1505,52 @@ elif page == "🏠 Gestiune Imobile":
                                     st.rerun()
 
                                 if submitted:
+                                    errors = []
+
                                     if not edit_nume.strip():
-                                        st.error("❌ Numele imobilului este obligatoriu!")
+                                        errors.append("❌ Numele imobilului este obligatoriu")
                                     elif len(edit_nume) > 100:
-                                        st.error("❌ Numele este prea lung (max 100 caractere)")
+                                        errors.append("❌ Numele este prea lung (max 100 caractere)")
+
+                                    if not edit_judet:
+                                        errors.append("❌ Județul este obligatoriu")
+                                    if not edit_localitate.strip():
+                                        errors.append("❌ Localitatea este obligatorie")
+                                    if not edit_strada.strip():
+                                        errors.append("❌ Strada este obligatorie")
+                                    if not edit_numar.strip():
+                                        errors.append("❌ Numărul este obligatoriu")
+
+                                    if edit_cod_postal.strip():
+                                        is_valid, error_msg = validari.valideaza_cod_postal(edit_cod_postal)
+                                        if not is_valid:
+                                            errors.append(f"❌ {error_msg}")
+
+                                    if errors:
+                                        for error in errors:
+                                            st.error(error)
                                     else:
                                         try:
+                                            # Formează adresa completă
+                                            adresa_completa = validari.formateaza_adresa_completa(
+                                                edit_judet, edit_localitate, edit_strada, edit_numar,
+                                                edit_bloc, edit_scara, edit_etaj, edit_apartament, edit_cod_postal
+                                            )
+
                                             # Actualizează imobilul
                                             update_data = {
                                                 "nume": edit_nume.strip(),
-                                                "adresa": edit_adresa.strip() if edit_adresa else None,
+                                                "adresa": adresa_completa,  # Câmp legacy
+                                                "judet": edit_judet,
+                                                "localitate": edit_localitate.strip(),
+                                                "strada": edit_strada.strip(),
+                                                "numar": edit_numar.strip(),
+                                                "bloc": edit_bloc.strip() if edit_bloc.strip() else None,
+                                                "scara": edit_scara.strip() if edit_scara.strip() else None,
+                                                "etaj": edit_etaj.strip() if edit_etaj.strip() else None,
+                                                "apartament": edit_apartament.strip() if edit_apartament.strip() else None,
+                                                "cod_postal": edit_cod_postal.strip() if edit_cod_postal.strip() else None,
+                                                "numar_camere": edit_numar_camere,
                                                 "procent_proprietate": edit_procent
                                             }
 
@@ -1136,7 +1562,7 @@ elif page == "🏠 Gestiune Imobile":
                                                     "procent_proprietate": edit_procent
                                                 }).eq("imobil_id", imobil['id']).eq("user_id", st.session_state.user_id).execute()
 
-                                            st.success(f"✅ Imobilul '{edit_nume}' a fost actualizat!")
+                                            st.success(f"✅ Imobilul '{edit_nume}' a fost actualizat cu succes!")
                                             del st.session_state[f"editing_{imobil['id']}"]
                                             st.rerun()
                                         except Exception as e:
@@ -1298,33 +1724,133 @@ elif page == "📄 Gestiune Contracte":
                         format_func=lambda x: imobile_dict[x]
                     )
 
+                    # Secțiunea 1: Date Contract
+                    st.markdown("##### 📄 Date Contract")
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        nr_contract = st.text_input("Nr. Contract*", placeholder="ex: C-2026-001", help="Numărul contractului")
+                    with col2:
+                        data_contract = st.date_input("Data Contract*", value=datetime.date.today(), help="Data semnării contractului")
+                    with col3:
+                        pdf_url = st.text_input("Link Contract PDF", placeholder="https://...", help="Link către PDF (opțional)")
+
+                    # Secțiunea 2: Date Locatar (Chiriaș)
+                    st.markdown("##### 👤 Date Locatar (Chiriaș)")
+
                     col1, col2 = st.columns(2)
                     with col1:
-                        nr_contract = st.text_input("Nr. Contract", placeholder="ex: C-2026-001")
-                        locatar = st.text_input("Nume Locatar*", placeholder="ex: Popescu Ion")
+                        tip_locatar = st.selectbox(
+                            "Tip Locatar*",
+                            options=["persoana_fizica", "persoana_juridica"],
+                            format_func=lambda x: "Persoană Fizică" if x == "persoana_fizica" else "Persoană Juridică",
+                            help="Selectează tipul locatarului"
+                        )
                     with col2:
-                        cnp_cui = st.text_input("CNP/CUI", placeholder="13 cifre pentru PF, 2-10 pentru PJ")
-                        pdf_url = st.text_input("Link Contract PDF (opțional)", placeholder="https://...")
+                        locatar = st.text_input("Nume Complet / Denumire*", placeholder="ex: Popescu Ion sau S.C. Firma S.R.L.", help="Numele complet pentru PF sau denumirea pentru PJ")
 
-                    col3, col4 = st.columns(2)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        cnp_cui = st.text_input(
+                            "CNP / CUI*",
+                            placeholder="13 cifre pentru PF, 2-10 pentru PJ",
+                            help="CNP pentru persoane fizice, CUI pentru persoane juridice"
+                        )
+                    with col2:
+                        locatar_telefon = st.text_input(
+                            "Telefon Locatar*",
+                            placeholder="ex: 0722123456",
+                            help="Număr de telefon pentru contact"
+                        )
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        locatar_email = st.text_input(
+                            "Email Locatar",
+                            placeholder="ex: locatar@email.com",
+                            help="Adresă de email (opțional)"
+                        )
+                    with col2:
+                        locatar_adresa = st.text_input(
+                            "Adresă Domiciliu Locatar*",
+                            placeholder="ex: Str. Victoriei nr. 20, București",
+                            help="Adresa completă de domiciliu"
+                        )
+
+                    # Secțiunea 3: Date Financiare și Perioada
+                    st.markdown("##### 💰 Date Financiare și Perioada")
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        chirie = st.number_input("Chirie Lunară*", min_value=0.0, value=500.0, step=50.0, help="Cuantumul chiriei lunare")
+                    with col2:
+                        moneda = st.selectbox("Monedă*", validari.MONEDE, help="Moneda în care se plătește chiria")
                     with col3:
-                        chirie = st.number_input("Chirie Lunară*", min_value=0.0, value=500.0, step=50.0)
-                        moneda = st.selectbox("Monedă", ["RON", "EUR"])
-                    with col4:
-                        data_start = st.date_input("Data Început*", value=datetime.date.today())
+                        frecventa_plata = st.selectbox(
+                            "Frecvență Plată*",
+                            options=validari.FRECVENTE_PLATA,
+                            format_func=lambda x: x.capitalize(),
+                            help="Cât de des se plătește chiria"
+                        )
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        data_start = st.date_input("Data Început*", value=datetime.date.today(), help="Data de începere a contractului")
+                    with col2:
                         data_end = st.date_input("Data Sfârșit", value=None, help="Lasă gol pentru contract pe durată nedeterminată")
+                    with col3:
+                        numar_camere_inchiriate = st.number_input(
+                            "Nr. Camere Închiriate",
+                            min_value=0,
+                            max_value=20,
+                            value=0,
+                            help="Lasă 0 dacă se închiriază tot imobilul"
+                        )
 
                     submitted_contract = st.form_submit_button("💾 Salvează Contract", use_container_width=True)
 
                     if submitted_contract:
                         erori = []
 
+                        # Validări
+                        if not nr_contract.strip():
+                            erori.append("Numărul contractului este obligatoriu")
                         if not locatar.strip():
                             erori.append("Numele locatarului este obligatoriu")
+                        if not cnp_cui.strip():
+                            erori.append("CNP/CUI este obligatoriu")
+                        else:
+                            # Validare CNP sau CUI în funcție de tip
+                            if tip_locatar == "persoana_fizica":
+                                is_valid, error_msg = validari.valideaza_cnp(cnp_cui)
+                                if not is_valid:
+                                    erori.append(f"CNP invalid: {error_msg}")
+                            else:
+                                is_valid, error_msg = validari.valideaza_cui(cnp_cui)
+                                if not is_valid:
+                                    erori.append(f"CUI invalid: {error_msg}")
+
+                        if not locatar_telefon.strip():
+                            erori.append("Telefonul locatarului este obligatoriu")
+                        else:
+                            is_valid, error_msg = validari.valideaza_telefon(locatar_telefon)
+                            if not is_valid:
+                                erori.append(f"Telefon invalid: {error_msg}")
+
+                        if locatar_email.strip():
+                            is_valid, error_msg = validari.valideaza_email(locatar_email)
+                            if not is_valid:
+                                erori.append(f"Email invalid: {error_msg}")
+
+                        if not locatar_adresa.strip():
+                            erori.append("Adresa locatarului este obligatorie")
+
                         if chirie <= 0:
                             erori.append("Chiria trebuie să fie > 0")
-                        if cnp_cui and not valideaza_cnp_cui(cnp_cui):
-                            erori.append("CNP/CUI invalid (doar cifre, lungime 6-13)")
+
+                        if data_contract > data_start:
+                            erori.append("Data contractului nu poate fi după data de început")
+
                         if data_end and data_end < data_start:
                             erori.append("Data sfârșit nu poate fi înainte de data început")
 
@@ -1335,17 +1861,24 @@ elif page == "📄 Gestiune Contracte":
                             try:
                                 supabase.table("contracte").insert({
                                     "imobil_id": imobil_selectat,
-                                    "nr_contract": nr_contract.strip() if nr_contract else None,
+                                    "nr_contract": nr_contract.strip(),
+                                    "data_contract": data_contract.isoformat(),
+                                    "locatar_tip": tip_locatar,
                                     "locatar": locatar.strip(),
-                                    "cnp_cui": cnp_cui.strip() if cnp_cui else None,
+                                    "cnp_cui": cnp_cui.strip(),
+                                    "locatar_telefon": locatar_telefon.strip(),
+                                    "locatar_email": locatar_email.strip() if locatar_email.strip() else None,
+                                    "locatar_adresa": locatar_adresa.strip(),
                                     "chirie_lunara": chirie,
                                     "moneda": moneda,
+                                    "frecventa_plata": frecventa_plata,
+                                    "numar_camere_inchiriate": numar_camere_inchiriate if numar_camere_inchiriate > 0 else None,
                                     "data_inceput": data_start.isoformat(),
                                     "data_sfarsit": data_end.isoformat() if data_end else None,
                                     "pdf_url": pdf_url.strip() if pdf_url else None,
                                     "user_id": st.session_state.user_id
                                 }).execute()
-                                st.success(f"✅ Contract pentru '{locatar}' a fost salvat!")
+                                st.success(f"✅ Contract pentru '{locatar}' a fost salvat cu succes!")
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"❌ Eroare la salvare: {str(e)}")
@@ -1453,36 +1986,90 @@ elif page == "📄 Gestiune Contracte":
                                                 key=f"edit_imobil_{contract['id']}"
                                             )
 
-                                            col1_e, col2_e = st.columns(2)
+                                            # Secțiunea 1: Date Contract
+                                            st.markdown("##### 📄 Date Contract")
+
+                                            col1_e, col2_e, col3_e = st.columns(3)
                                             with col1_e:
                                                 edit_nr_contract = st.text_input(
-                                                    "Nr. Contract",
+                                                    "Nr. Contract*",
                                                     value=contract.get('nr_contract', ''),
                                                     placeholder="ex: C-2026-001",
                                                     key=f"edit_nr_{contract['id']}"
                                                 )
-                                                edit_locatar = st.text_input(
-                                                    "Nume Locatar*",
-                                                    value=contract['locatar'],
-                                                    placeholder="ex: Popescu Ion",
-                                                    key=f"edit_locatar_{contract['id']}"
-                                                )
                                             with col2_e:
-                                                edit_cnp_cui = st.text_input(
-                                                    "CNP/CUI",
-                                                    value=contract.get('cnp_cui', ''),
-                                                    placeholder="13 cifre pentru PF, 2-10 pentru PJ",
-                                                    key=f"edit_cnp_{contract['id']}"
+                                                current_data_contract = datetime.datetime.strptime(contract['data_contract'], '%Y-%m-%d').date() if contract.get('data_contract') else datetime.date.today()
+                                                edit_data_contract = st.date_input(
+                                                    "Data Contract*",
+                                                    value=current_data_contract,
+                                                    key=f"edit_data_contract_{contract['id']}"
                                                 )
+                                            with col3_e:
                                                 edit_pdf_url = st.text_input(
-                                                    "Link Contract PDF (opțional)",
+                                                    "Link Contract PDF",
                                                     value=contract.get('pdf_url', ''),
                                                     placeholder="https://...",
                                                     key=f"edit_pdf_{contract['id']}"
                                                 )
 
-                                            col3_e, col4_e = st.columns(2)
-                                            with col3_e:
+                                            # Secțiunea 2: Date Locatar
+                                            st.markdown("##### 👤 Date Locatar (Chiriaș)")
+
+                                            col1_e, col2_e = st.columns(2)
+                                            with col1_e:
+                                                tip_idx = 0 if contract.get('locatar_tip', 'persoana_fizica') == 'persoana_fizica' else 1
+                                                edit_tip_locatar = st.selectbox(
+                                                    "Tip Locatar*",
+                                                    options=["persoana_fizica", "persoana_juridica"],
+                                                    index=tip_idx,
+                                                    format_func=lambda x: "Persoană Fizică" if x == "persoana_fizica" else "Persoană Juridică",
+                                                    key=f"edit_tip_loc_{contract['id']}"
+                                                )
+                                            with col2_e:
+                                                edit_locatar = st.text_input(
+                                                    "Nume Complet / Denumire*",
+                                                    value=contract['locatar'],
+                                                    placeholder="ex: Popescu Ion sau S.C. Firma S.R.L.",
+                                                    key=f"edit_locatar_{contract['id']}"
+                                                )
+
+                                            col1_e, col2_e = st.columns(2)
+                                            with col1_e:
+                                                edit_cnp_cui = st.text_input(
+                                                    "CNP / CUI*",
+                                                    value=contract.get('cnp_cui', ''),
+                                                    placeholder="13 cifre pentru PF, 2-10 pentru PJ",
+                                                    key=f"edit_cnp_{contract['id']}"
+                                                )
+                                            with col2_e:
+                                                edit_locatar_telefon = st.text_input(
+                                                    "Telefon Locatar*",
+                                                    value=contract.get('locatar_telefon', ''),
+                                                    placeholder="ex: 0722123456",
+                                                    key=f"edit_loc_tel_{contract['id']}"
+                                                )
+
+                                            col1_e, col2_e = st.columns(2)
+                                            with col1_e:
+                                                edit_locatar_email = st.text_input(
+                                                    "Email Locatar",
+                                                    value=contract.get('locatar_email', ''),
+                                                    placeholder="ex: locatar@email.com",
+                                                    key=f"edit_loc_email_{contract['id']}"
+                                                )
+                                            with col2_e:
+                                                edit_locatar_adresa = st.text_input(
+                                                    "Adresă Domiciliu Locatar*",
+                                                    value=contract.get('locatar_adresa', ''),
+                                                    placeholder="ex: Str. Victoriei nr. 20, București",
+                                                    key=f"edit_loc_adr_{contract['id']}"
+                                                )
+
+                                            # Secțiunea 3: Date Financiare și Perioada
+                                            st.markdown("##### 💰 Date Financiare și Perioada")
+
+                                            col1_e, col2_e, col3_e = st.columns(3)
+                                            with col1_e:
                                                 edit_chirie = st.number_input(
                                                     "Chirie Lunară*",
                                                     min_value=0.0,
@@ -1490,25 +2077,53 @@ elif page == "📄 Gestiune Contracte":
                                                     step=50.0,
                                                     key=f"edit_chirie_{contract['id']}"
                                                 )
-                                                moneda_idx = 0 if contract['moneda'] == 'RON' else 1
+                                            with col2_e:
+                                                try:
+                                                    moneda_idx = validari.MONEDE.index(contract['moneda']) if contract['moneda'] in validari.MONEDE else 0
+                                                except:
+                                                    moneda_idx = 0
                                                 edit_moneda = st.selectbox(
-                                                    "Monedă",
-                                                    ["RON", "EUR"],
+                                                    "Monedă*",
+                                                    validari.MONEDE,
                                                     index=moneda_idx,
                                                     key=f"edit_moneda_{contract['id']}"
                                                 )
-                                            with col4_e:
+                                            with col3_e:
+                                                try:
+                                                    frecv_idx = validari.FRECVENTE_PLATA.index(contract.get('frecventa_plata', 'lunar'))
+                                                except:
+                                                    frecv_idx = 0
+                                                edit_frecventa_plata = st.selectbox(
+                                                    "Frecvență Plată*",
+                                                    validari.FRECVENTE_PLATA,
+                                                    index=frecv_idx,
+                                                    format_func=lambda x: x.capitalize(),
+                                                    key=f"edit_frecv_{contract['id']}"
+                                                )
+
+                                            col1_e, col2_e, col3_e = st.columns(3)
+                                            with col1_e:
                                                 edit_data_start = st.date_input(
                                                     "Data Început*",
                                                     value=datetime.datetime.strptime(contract['data_inceput'], '%Y-%m-%d').date(),
                                                     key=f"edit_start_{contract['id']}"
                                                 )
+                                            with col2_e:
                                                 current_data_end = datetime.datetime.strptime(contract['data_sfarsit'], '%Y-%m-%d').date() if contract.get('data_sfarsit') else None
                                                 edit_data_end = st.date_input(
                                                     "Data Sfârșit",
                                                     value=current_data_end,
                                                     help="Lasă gol pentru contract pe durată nedeterminată",
                                                     key=f"edit_end_{contract['id']}"
+                                                )
+                                            with col3_e:
+                                                edit_numar_camere_inchiriate = st.number_input(
+                                                    "Nr. Camere Închiriate",
+                                                    min_value=0,
+                                                    max_value=20,
+                                                    value=int(contract.get('numar_camere_inchiriate', 0)) if contract.get('numar_camere_inchiriate') else 0,
+                                                    help="Lasă 0 dacă se închiriază tot imobilul",
+                                                    key=f"edit_cam_inch_{contract['id']}"
                                                 )
 
                                             col_save_c, col_cancel_c = st.columns(2)
@@ -1526,12 +2141,47 @@ elif page == "📄 Gestiune Contracte":
                                             if submitted_edit:
                                                 erori_edit = []
 
+                                                # Validări
+                                                if not edit_nr_contract.strip():
+                                                    erori_edit.append("Numărul contractului este obligatoriu")
+
                                                 if not edit_locatar.strip():
                                                     erori_edit.append("Numele locatarului este obligatoriu")
+
+                                                if not edit_cnp_cui.strip():
+                                                    erori_edit.append("CNP/CUI este obligatoriu")
+                                                else:
+                                                    # Validare CNP sau CUI în funcție de tip
+                                                    if edit_tip_locatar == "persoana_fizica":
+                                                        is_valid, error_msg = validari.valideaza_cnp(edit_cnp_cui)
+                                                        if not is_valid:
+                                                            erori_edit.append(f"CNP invalid: {error_msg}")
+                                                    else:
+                                                        is_valid, error_msg = validari.valideaza_cui(edit_cnp_cui)
+                                                        if not is_valid:
+                                                            erori_edit.append(f"CUI invalid: {error_msg}")
+
+                                                if not edit_locatar_telefon.strip():
+                                                    erori_edit.append("Telefonul locatarului este obligatoriu")
+                                                else:
+                                                    is_valid, error_msg = validari.valideaza_telefon(edit_locatar_telefon)
+                                                    if not is_valid:
+                                                        erori_edit.append(f"Telefon invalid: {error_msg}")
+
+                                                if edit_locatar_email.strip():
+                                                    is_valid, error_msg = validari.valideaza_email(edit_locatar_email)
+                                                    if not is_valid:
+                                                        erori_edit.append(f"Email invalid: {error_msg}")
+
+                                                if not edit_locatar_adresa.strip():
+                                                    erori_edit.append("Adresa locatarului este obligatorie")
+
                                                 if edit_chirie <= 0:
                                                     erori_edit.append("Chiria trebuie să fie > 0")
-                                                if edit_cnp_cui and not valideaza_cnp_cui(edit_cnp_cui):
-                                                    erori_edit.append("CNP/CUI invalid (doar cifre, lungime 6-13)")
+
+                                                if edit_data_contract > edit_data_start:
+                                                    erori_edit.append("Data contractului nu poate fi după data de început")
+
                                                 if edit_data_end and edit_data_end < edit_data_start:
                                                     erori_edit.append("Data sfârșit nu poate fi înainte de data început")
 
@@ -1542,11 +2192,18 @@ elif page == "📄 Gestiune Contracte":
                                                     try:
                                                         update_contract_data = {
                                                             "imobil_id": edit_imobil,
-                                                            "nr_contract": edit_nr_contract.strip() if edit_nr_contract else None,
+                                                            "nr_contract": edit_nr_contract.strip(),
+                                                            "data_contract": edit_data_contract.isoformat(),
+                                                            "locatar_tip": edit_tip_locatar,
                                                             "locatar": edit_locatar.strip(),
-                                                            "cnp_cui": edit_cnp_cui.strip() if edit_cnp_cui else None,
+                                                            "cnp_cui": edit_cnp_cui.strip(),
+                                                            "locatar_telefon": edit_locatar_telefon.strip(),
+                                                            "locatar_email": edit_locatar_email.strip() if edit_locatar_email.strip() else None,
+                                                            "locatar_adresa": edit_locatar_adresa.strip(),
                                                             "chirie_lunara": edit_chirie,
                                                             "moneda": edit_moneda,
+                                                            "frecventa_plata": edit_frecventa_plata,
+                                                            "numar_camere_inchiriate": edit_numar_camere_inchiriate if edit_numar_camere_inchiriate > 0 else None,
                                                             "data_inceput": edit_data_start.isoformat(),
                                                             "data_sfarsit": edit_data_end.isoformat() if edit_data_end else None,
                                                             "pdf_url": edit_pdf_url.strip() if edit_pdf_url else None
@@ -1554,7 +2211,7 @@ elif page == "📄 Gestiune Contracte":
 
                                                         supabase.table("contracte").update(update_contract_data).eq("id", contract['id']).execute()
 
-                                                        st.success(f"✅ Contractul pentru '{edit_locatar}' a fost actualizat!")
+                                                        st.success(f"✅ Contractul pentru '{edit_locatar}' a fost actualizat cu succes!")
                                                         del st.session_state[f"editing_contract_{contract['id']}"]
                                                         st.rerun()
                                                     except Exception as e:
