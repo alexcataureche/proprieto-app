@@ -294,16 +294,56 @@ elif page == "⚙️ Administrare" and auth.is_admin():
 if page == "📊 Dashboard Fiscal":
     st.title("📊 Monitorizare Venituri și Calculatoare Fiscale")
 
-    col_settings = st.columns([2, 1])
-    with col_settings[0]:
-        an_fiscal = st.selectbox("An Fiscal", [2025, 2026], index=1)
-    with col_settings[1]:
-        curs = st.number_input("Curs Mediu BNR (EUR→RON)", value=CURS_BNR_DEFAULT, min_value=1.0, max_value=10.0, step=0.01)
+    # Filtrare pentru admini
+    is_admin = auth.is_admin()
+    selected_user_id = None
+
+    if is_admin:
+        # Admini pot filtra după utilizator
+        try:
+            users_result = supabase.table("users").select("id, email, nume").order("nume").execute()
+            if users_result.data:
+                user_options = {u['id']: f"{u['nume']} ({u['email']})" for u in users_result.data}
+                user_options['all'] = "🌐 Toți utilizatorii (consolidat)"
+                user_options[st.session_state.user_id] = f"👤 {user_options.get(st.session_state.user_id, 'Contul meu')}"
+
+                col_filter, col_year, col_curs = st.columns([2, 1, 1])
+                with col_filter:
+                    selected_filter = st.selectbox(
+                        "Vizualizare date pentru:",
+                        options=['all', st.session_state.user_id] + [k for k in user_options.keys() if k not in ['all', st.session_state.user_id]],
+                        format_func=lambda x: user_options.get(x, x),
+                        index=0
+                    )
+                    selected_user_id = None if selected_filter == 'all' else selected_filter
+                with col_year:
+                    an_fiscal = st.selectbox("An Fiscal", [2025, 2026], index=1)
+                with col_curs:
+                    curs = st.number_input("Curs BNR", value=CURS_BNR_DEFAULT, min_value=1.0, max_value=10.0, step=0.01)
+        except:
+            st.warning("Eroare la încărcarea utilizatorilor")
+            col_year, col_curs = st.columns(2)
+            with col_year:
+                an_fiscal = st.selectbox("An Fiscal", [2025, 2026], index=1)
+            with col_curs:
+                curs = st.number_input("Curs Mediu BNR (EUR→RON)", value=CURS_BNR_DEFAULT, min_value=1.0, max_value=10.0, step=0.01)
+    else:
+        # Useri văd doar propriile date
+        selected_user_id = st.session_state.user_id
+        col_settings = st.columns([2, 1])
+        with col_settings[0]:
+            an_fiscal = st.selectbox("An Fiscal", [2025, 2026], index=1)
+        with col_settings[1]:
+            curs = st.number_input("Curs Mediu BNR (EUR→RON)", value=CURS_BNR_DEFAULT, min_value=1.0, max_value=10.0, step=0.01)
 
     try:
-        # Preluare date (filtrare după user_id)
-        user_id = st.session_state.user_id
-        res = supabase.table("contracte").select("*, imobile(procent_proprietate, nume)").eq("user_id", user_id).execute()
+        # Preluare date (cu sau fără filtrare după utilizator)
+        if selected_user_id:
+            # Filtrare pentru un singur utilizator
+            res = supabase.table("contracte").select("*, imobile(procent_proprietate, nume), users(nume, email)").eq("user_id", selected_user_id).execute()
+        else:
+            # Toate datele (doar pentru admini)
+            res = supabase.table("contracte").select("*, imobile(procent_proprietate, nume), users(nume, email)").execute()
 
         if not res.data:
             st.info("📭 Nu există contracte înregistrate. Mergi la **Gestiune Contracte** pentru a adăuga primul contract.")
@@ -323,14 +363,23 @@ if page == "📊 Dashboard Fiscal":
 
                     venit_ron = chirie_cota * (curs if contract['moneda'] == 'EUR' else 1)
 
-                    venituri.append({
+                    venit_data = {
                         'Imobil': contract['imobile']['nume'],
                         'Locatar': contract['locatar'],
                         'Chirie/lună': f"{contract['chirie_lunara']:,.2f} {contract['moneda']}",
                         'Luni active': luni_active,
                         'Cotă proprietate': f"{contract['imobile']['procent_proprietate']}%",
                         'Venit RON': venit_ron
-                    })
+                    }
+
+                    # Adaugă coloana Proprietar pentru admini când vizualizează toți userii
+                    if is_admin and not selected_user_id and contract.get('users'):
+                        venit_data = {
+                            'Proprietar': contract['users']['nume'],
+                            **venit_data
+                        }
+
+                    venituri.append(venit_data)
                 except Exception as e:
                     st.warning(f"⚠️ Eroare la procesarea contractului {contract.get('nr_contract', 'N/A')}: {str(e)}")
 
@@ -435,8 +484,32 @@ elif page == "🏠 Gestiune Imobile":
 
     # Listare imobile existente
     st.markdown("### 📋 Imobile Înregistrate")
+
+    # Filtrare pentru admini
+    if auth.is_admin():
+        st.info("👑 **Mod Administrator:** Vezi toate imobilele sau filtrează după utilizator")
+        try:
+            users_result = supabase.table("users").select("id, nume, email").order("nume").execute()
+            if users_result.data:
+                filter_options = {"all": "🌐 Toate imobilele"}
+                filter_options.update({u['id']: f"{u['nume']} ({u['email']})" for u in users_result.data})
+
+                selected_user_filter = st.selectbox(
+                    "Filtrează imobile:",
+                    options=list(filter_options.keys()),
+                    format_func=lambda x: filter_options[x]
+                )
+        except:
+            selected_user_filter = st.session_state.user_id
+    else:
+        selected_user_filter = st.session_state.user_id
+
     try:
-        res = supabase.table("imobile").select("*").eq("user_id", st.session_state.user_id).order("created_at", desc=True).execute()
+        # Query cu sau fără filtrare
+        if selected_user_filter == "all":
+            res = supabase.table("imobile").select("*, users(nume, email)").order("created_at", desc=True).execute()
+        else:
+            res = supabase.table("imobile").select("*, users(nume, email)").eq("user_id", selected_user_filter).order("created_at", desc=True).execute()
 
         if not res.data:
             st.info("📭 Niciun imobil înregistrat încă.")
@@ -448,10 +521,15 @@ elif page == "🏠 Gestiune Imobile":
                         st.markdown(f"**{imobil['nume']}**")
                         if imobil.get('adresa'):
                             st.caption(f"📍 {imobil['adresa']}")
+                        # Afișează proprietarul pentru admini
+                        if auth.is_admin() and imobil.get('users'):
+                            st.caption(f"👤 Proprietar: {imobil['users']['nume']}")
                     with col2:
                         st.metric("Cotă proprietate", f"{imobil['procent_proprietate']}%")
                     with col3:
-                        if st.button("🗑️", key=f"del_imobil_{imobil['id']}", help="Șterge imobil"):
+                        # Adminii pot șterge orice, userii doar ale lor
+                        can_delete = auth.is_admin() or imobil.get('user_id') == st.session_state.user_id
+                        if can_delete and st.button("🗑️", key=f"del_imobil_{imobil['id']}", help="Șterge imobil"):
                             try:
                                 supabase.table("imobile").delete().eq("id", imobil['id']).execute()
                                 st.success("✅ Imobil șters!")
@@ -538,8 +616,32 @@ elif page == "📄 Gestiune Contracte":
 
             # Listare contracte existente
             st.markdown("### 📋 Contracte Active")
+
+            # Filtrare pentru admini
+            if auth.is_admin():
+                st.info("👑 **Mod Administrator:** Vezi toate contractele sau filtrează după utilizator")
+                try:
+                    users_result_c = supabase.table("users").select("id, nume, email").order("nume").execute()
+                    if users_result_c.data:
+                        filter_options_c = {"all": "🌐 Toate contractele"}
+                        filter_options_c.update({u['id']: f"{u['nume']} ({u['email']})" for u in users_result_c.data})
+
+                        selected_user_filter_c = st.selectbox(
+                            "Filtrează contracte:",
+                            options=list(filter_options_c.keys()),
+                            format_func=lambda x: filter_options_c[x]
+                        )
+                except:
+                    selected_user_filter_c = st.session_state.user_id
+            else:
+                selected_user_filter_c = st.session_state.user_id
+
             try:
-                res_contracte = supabase.table("contracte").select("*, imobile(nume)").eq("user_id", st.session_state.user_id).order("data_inceput", desc=True).execute()
+                # Query cu sau fără filtrare
+                if selected_user_filter_c == "all":
+                    res_contracte = supabase.table("contracte").select("*, imobile(nume), users(nume, email)").order("data_inceput", desc=True).execute()
+                else:
+                    res_contracte = supabase.table("contracte").select("*, imobile(nume), users(nume, email)").eq("user_id", selected_user_filter_c).order("data_inceput", desc=True).execute()
 
                 if not res_contracte.data:
                     st.info("📭 Niciun contract înregistrat încă.")
@@ -553,6 +655,9 @@ elif page == "📄 Gestiune Contracte":
                                 st.caption(f"🏠 {contract['imobile']['nume']}")
                                 if contract.get('nr_contract'):
                                     st.caption(f"📋 {contract['nr_contract']}")
+                                # Afișează proprietarul pentru admini
+                                if auth.is_admin() and contract.get('users'):
+                                    st.caption(f"👤 {contract['users']['nume']}")
 
                             with col2:
                                 st.metric("Chirie", f"{contract['chirie_lunara']:,.0f} {contract['moneda']}")
@@ -566,7 +671,9 @@ elif page == "📄 Gestiune Contracte":
                             with col4:
                                 if contract.get('pdf_url'):
                                     st.link_button("📄", contract['pdf_url'], help="Vezi contract")
-                                if st.button("🗑️", key=f"del_contract_{contract['id']}", help="Șterge contract"):
+                                # Adminii pot șterge orice, userii doar ale lor
+                                can_delete_c = auth.is_admin() or contract.get('user_id') == st.session_state.user_id
+                                if can_delete_c and st.button("🗑️", key=f"del_contract_{contract['id']}", help="Șterge contract"):
                                     try:
                                         supabase.table("contracte").delete().eq("id", contract['id']).execute()
                                         st.success("✅ Contract șters!")
