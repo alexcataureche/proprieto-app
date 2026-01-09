@@ -1,26 +1,34 @@
-# 🏠 Proprieto ANAF-Ready 2026
+# 🏠 Proprieto ANAF-Ready 2026 v2.0
 
-**Aplicație de gestiune imobiliară și calculare automată a taxelor conform legislației fiscale românești 2026**
+**Aplicație multi-user de gestiune imobiliară și calculare automată a taxelor conform legislației fiscale românești 2026**
+
+[![Security: Authentication](https://img.shields.io/badge/Security-Authenticated-green)]()
+[![Multi-User](https://img.shields.io/badge/Multi--User-Enabled-blue)]()
+[![Admin Panel](https://img.shields.io/badge/Admin-Panel-orange)]()
 
 ---
 
 ## 📋 Ce Face Aplicația?
 
-Proprieto este o platformă web care automatizează:
-- **Gestiunea portofoliului imobiliar** (multiple proprietăți, cote de proprietate)
-- **Evidența contractelor de închiriere** (RON/EUR, perioade multiple)
-- **Calculul automat al taxelor ANAF**: Impozit (10%) + CASS (praguri 0/1/2/3)
-- **Export rapoarte** pentru declarația D212 (Excel + PDF cu instrucțiuni)
+Proprieto este o platformă web securizată care automatizează:
+- 🔐 **Autentificare & Management utilizatori** (admin panel complet)
+- 🏠 **Gestiunea portofoliului imobiliar** (multiple proprietăți, cote de proprietate)
+- 📄 **Evidența contractelor de închiriere** (RON/EUR, perioade multiple)
+- 💰 **Calculul automat al taxelor ANAF**: Impozit (10%) + CASS (praguri 0/1/2/3)
+- 📊 **Export rapoarte** pentru declarația D212 (Excel + PDF cu instrucțiuni)
+- 👥 **Multi-user support** (fiecare utilizator vede doar propriile date)
 
 ---
 
-## ⚡ Instalare Rapidă (5 pași)
+## ⚡ Instalare Rapidă (6 pași)
 
 ### 1. Pregătire Bază de Date (Supabase)
 
 Creează un cont gratuit pe [supabase.com](https://supabase.com) și creează un proiect nou.
 
 **SQL Script pentru Setup:**
+
+**A. Rulează `setup.sql` (Database principal):**
 
 ```sql
 -- Tabel Imobile
@@ -53,6 +61,18 @@ CREATE INDEX idx_contracte_perioada ON contracte(data_inceput, data_sfarsit);
 ```
 
 Copiază scriptul în **Supabase Dashboard** → **SQL Editor** → **New Query** → **Run**.
+
+**B. Rulează `setup_auth.sql` (Autentificare):**
+
+Creează tabelul utilizatori și cont admin default:
+
+```sql
+-- Vezi fișierul setup_auth.sql pentru scriptul complet
+-- Cont default: admin@proprieto.ro / admin123
+-- ⚠️ SCHIMBĂ PAROLA după primul login!
+```
+
+**📖 Ghid detaliat:** Vezi `AUTH_SETUP.md` pentru instrucțiuni complete de configurare autentificare.
 
 ---
 

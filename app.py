@@ -5,9 +5,13 @@ from fpdf import FPDF
 from io import BytesIO
 import datetime
 from dateutil.relativedelta import relativedelta
+import auth  # Modul de autentificare
 
 # --- CONFIGURARE ---
 st.set_page_config(page_title="Proprieto 2026", layout="wide", page_icon="🏠")
+
+# Inițializare session state pentru autentificare
+auth.init_session_state()
 
 # Conectare la Supabase
 DB_CONNECTED = False
@@ -156,13 +160,135 @@ def genereaza_pdf_d212(fisc, an_fiscal):
         pdf.cell(0, 8, f"Prag CASS D212: {fisc['prag']}", ln=True)
         return bytes(pdf.output())
 
-# --- INTERFAȚĂ ---
-st.sidebar.title("🏢 Proprieto ANAF 2026")
-page = st.sidebar.radio("Navigare:", ["📊 Dashboard Fiscal", "🏠 Gestiune Imobile", "📄 Gestiune Contracte"])
-
+# --- VERIFICARE CONEXIUNE DB ---
 if not DB_CONNECTED:
-    st.warning("🔌 Aplicația rulează fără conexiune la baza de date. Configurează Supabase pentru funcționalitate completă.")
+    st.error("🔌 Aplicația nu poate funcționa fără conexiune la baza de date.")
+    st.info("Configurează SUPABASE_URL și SUPABASE_KEY în Settings > Secrets")
     st.stop()
+
+# ==================== AUTENTIFICARE ====================
+if not st.session_state.authenticated:
+    st.title("🏠 Proprieto ANAF 2026")
+    st.markdown("### Aplicație de Gestiune Imobiliară și Calcul Taxe")
+
+    tab1, tab2 = st.tabs(["🔐 Login", "📝 Înregistrare"])
+
+    with tab1:
+        st.subheader("Autentificare")
+
+        with st.form("login_form"):
+            email = st.text_input("Email", placeholder="adresa@exemplu.ro")
+            password = st.text_input("Parolă", type="password")
+            submitted = st.form_submit_button("🔓 Intră în Cont", use_container_width=True)
+
+            if submitted:
+                if not email or not password:
+                    st.error("❌ Completează toate câmpurile!")
+                else:
+                    success, message, user_data = auth.login_user(supabase, email, password)
+
+                    if success:
+                        st.success(f"✅ {message}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {message}")
+
+        # Link recuperare parolă
+        st.caption("Ai uitat parola? Contactează administratorul.")
+
+    with tab2:
+        st.subheader("Cont Nou")
+        st.info("💡 Doar administratorii pot crea conturi noi. Contactează admin@proprieto.ro pentru acces.")
+
+    # Footer
+    st.markdown("---")
+    st.caption("🏢 Proprieto ANAF 2026 v2.0 | Securitate: Autentificare obligatorie")
+
+    st.stop()
+
+# ==================== UTILIZATOR AUTENTIFICAT ====================
+# --- INTERFAȚĂ SIDEBAR ---
+st.sidebar.title("🏢 Proprieto ANAF 2026")
+
+# Info utilizator
+with st.sidebar:
+    st.markdown("---")
+    role_icon = "👑" if auth.is_admin() else "👤"
+    st.markdown(f"{role_icon} **{st.session_state.user_email}**")
+    st.caption(f"Rol: {st.session_state.user_role}")
+
+    # Buton logout
+    if st.button("🚪 Deconectare", use_container_width=True):
+        auth.logout_user()
+        st.rerun()
+
+# Meniu de navigare
+pages_user = ["📊 Dashboard Fiscal", "🏠 Gestiune Imobile", "📄 Gestiune Contracte", "👤 Cont"]
+
+if auth.is_admin():
+    pages_user.append("⚙️ Administrare")
+
+page = st.sidebar.radio("Navigare:", pages_user)
+
+# ==================== PAGINĂ: CONT ====================
+if page == "👤 Cont":
+    st.title("👤 Contul Meu")
+
+    tab1, tab2 = st.tabs(["📋 Informații", "🔒 Schimbă Parola"])
+
+    with tab1:
+        st.subheader("Informații Cont")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_input("Email", value=st.session_state.user_email, disabled=True)
+        with col2:
+            st.text_input("Rol", value=st.session_state.user_role, disabled=True)
+
+    with tab2:
+        st.subheader("🔒 Schimbă Parola")
+
+        with st.form("change_password_form"):
+            old_pwd = st.text_input("Parola Curentă", type="password")
+            new_pwd = st.text_input("Parolă Nouă", type="password")
+            confirm_pwd = st.text_input("Confirmă Parola Nouă", type="password")
+
+            submitted = st.form_submit_button("💾 Schimbă Parola")
+
+            if submitted:
+                if not old_pwd or not new_pwd or not confirm_pwd:
+                    st.error("❌ Toate câmpurile sunt obligatorii!")
+                elif new_pwd != confirm_pwd:
+                    st.error("❌ Parolele noi nu se potrivesc!")
+                else:
+                    success, message = auth.change_password(
+                        supabase,
+                        st.session_state.user_id,
+                        old_pwd,
+                        new_pwd
+                    )
+
+                    if success:
+                        st.success(f"✅ {message}")
+                    else:
+                        st.error(f"❌ {message}")
+
+# ==================== PAGINĂ: ADMINISTRARE ====================
+elif page == "⚙️ Administrare" and auth.is_admin():
+    import admin_panel
+
+    st.title("⚙️ Panou Administrare")
+
+    admin_tab = st.tabs(["👥 Utilizatori", "📊 Date Generale", "⚙️ Setări Sistem"])
+
+    with admin_tab[0]:
+        admin_panel.show_users_management(supabase)
+
+    with admin_tab[1]:
+        admin_panel.show_data_overview(supabase, st.session_state.user_id, True)
+
+    with admin_tab[2]:
+        admin_panel.show_system_settings(supabase)
 
 # ==================== PAGINA 1: DASHBOARD FISCAL ====================
 if page == "📊 Dashboard Fiscal":
@@ -175,8 +301,9 @@ if page == "📊 Dashboard Fiscal":
         curs = st.number_input("Curs Mediu BNR (EUR→RON)", value=CURS_BNR_DEFAULT, min_value=1.0, max_value=10.0, step=0.01)
 
     try:
-        # Preluare date
-        res = supabase.table("contracte").select("*, imobile(procent_proprietate, nume)").execute()
+        # Preluare date (filtrare după user_id)
+        user_id = st.session_state.user_id
+        res = supabase.table("contracte").select("*, imobile(procent_proprietate, nume)").eq("user_id", user_id).execute()
 
         if not res.data:
             st.info("📭 Nu există contracte înregistrate. Mergi la **Gestiune Contracte** pentru a adăuga primul contract.")
@@ -298,7 +425,8 @@ elif page == "🏠 Gestiune Imobile":
                         supabase.table("imobile").insert({
                             "nume": nume.strip(),
                             "adresa": adr.strip() if adr else None,
-                            "procent_proprietate": proc
+                            "procent_proprietate": proc,
+                            "user_id": st.session_state.user_id
                         }).execute()
                         st.success(f"✅ Imobil '{nume}' a fost înregistrat!")
                         st.rerun()
@@ -308,7 +436,7 @@ elif page == "🏠 Gestiune Imobile":
     # Listare imobile existente
     st.markdown("### 📋 Imobile Înregistrate")
     try:
-        res = supabase.table("imobile").select("*").order("created_at", desc=True).execute()
+        res = supabase.table("imobile").select("*").eq("user_id", st.session_state.user_id).order("created_at", desc=True).execute()
 
         if not res.data:
             st.info("📭 Niciun imobil înregistrat încă.")
@@ -338,9 +466,9 @@ elif page == "🏠 Gestiune Imobile":
 elif page == "📄 Gestiune Contracte":
     st.title("📄 Gestiune Contracte de Închiriere")
 
-    # Verificare existență imobile
+    # Verificare existență imobile (doar ale utilizatorului curent)
     try:
-        res_imobile = supabase.table("imobile").select("id, nume").execute()
+        res_imobile = supabase.table("imobile").select("id, nume").eq("user_id", st.session_state.user_id).execute()
 
         if not res_imobile.data:
             st.warning("⚠️ Trebuie să adaugi mai întâi un imobil în secțiunea **Gestiune Imobile**.")
@@ -400,7 +528,8 @@ elif page == "📄 Gestiune Contracte":
                                     "moneda": moneda,
                                     "data_inceput": data_start.isoformat(),
                                     "data_sfarsit": data_end.isoformat() if data_end else None,
-                                    "pdf_url": pdf_url.strip() if pdf_url else None
+                                    "pdf_url": pdf_url.strip() if pdf_url else None,
+                                    "user_id": st.session_state.user_id
                                 }).execute()
                                 st.success(f"✅ Contract pentru '{locatar}' a fost salvat!")
                                 st.rerun()
@@ -410,7 +539,7 @@ elif page == "📄 Gestiune Contracte":
             # Listare contracte existente
             st.markdown("### 📋 Contracte Active")
             try:
-                res_contracte = supabase.table("contracte").select("*, imobile(nume)").order("data_inceput", desc=True).execute()
+                res_contracte = supabase.table("contracte").select("*, imobile(nume)").eq("user_id", st.session_state.user_id).order("data_inceput", desc=True).execute()
 
                 if not res_contracte.data:
                     st.info("📭 Niciun contract înregistrat încă.")
