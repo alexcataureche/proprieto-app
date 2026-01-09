@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-navy font-bold;
+  }
+}
+
+@layer components {
+  /* Custom component styles */
+  .btn-primary {
+    @apply bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-600 transition-colors;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-navy border border-navy-200 px-4 py-2 rounded-lg font-medium hover:bg-navy-50 transition-colors;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-navy-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  }
+
+  .select-field {
+    @apply w-full px-3 py-2 border border-navy-200 rounded-lg text-navy focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white;
+  }
+
+  .card {
+    @apply bg-surface rounded-lg shadow-sm border border-navy-200 p-6;
+  }
+
+  .badge-success {
+    @apply inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background-color: #D1FAE5;
+    color: #065F46;
+  }
+
+  .badge-warning {
+    @apply inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background-color: #FEF3C7;
+    color: #92400E;
+  }
+
+  .badge-danger {
+    @apply inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background-color: #FEE2E2;
+    color: #991B1B;
+  }
+
+  .table-row-hover {
+    @apply hover:bg-navy-100 transition-colors cursor-pointer;
+  }
+
+  .admin-banner {
+    @apply bg-primary-50 text-primary-700 px-4 py-3 rounded-lg border border-primary-100;
+  }
+}
