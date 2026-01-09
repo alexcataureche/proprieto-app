@@ -261,11 +261,7 @@ SELECT
         WHEN c.frecventa_plata = 'semestrial' THEN c.chirie_lunara * 2
         WHEN c.frecventa_plata = 'anual' THEN c.chirie_lunara
         ELSE c.chirie_lunara * 12
-    END AS venit_anual_brut,
-
-    -- Date sistem (folosim created_at din users și imobile dacă există)
-    i.created_at AS imobil_created_at,
-    i.updated_at AS imobil_updated_at
+    END AS venit_anual_brut
 
 FROM contracte c
 JOIN users u ON c.user_id = u.id
