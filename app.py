@@ -799,18 +799,25 @@ elif page == "🏠 Gestiune Imobile":
 elif page == "📄 Gestiune Contracte":
     st.title("📄 Gestiune Contracte de Închiriere")
 
-    # Verificare existență imobile (doar ale utilizatorului curent)
+    # Verificare existență imobile (inclusiv co-proprietăți)
     try:
-        res_imobile = supabase.table("imobile").select("id, nume").eq("user_id", st.session_state.user_id).execute()
+        imobile_data = coproprietate.get_imobile_user(supabase, st.session_state.user_id, include_shared=True)
+        # Extrage datele imobilului din structura de co-proprietate
+        imobile_lista = []
+        for item in imobile_data:
+            if 'imobile' in item and item['imobile']:
+                imobile_lista.append(item['imobile'])
+            elif 'id' in item:  # Fallback pentru imobile simple
+                imobile_lista.append(item)
 
-        if not res_imobile.data:
+        if not imobile_lista:
             st.warning("⚠️ Trebuie să adaugi mai întâi un imobil în secțiunea **Gestiune Imobile**.")
         else:
             # Formular adăugare contract
             with st.expander("➕ Adaugă Contract Nou", expanded=True):
                 with st.form("contract_form"):
                     # Selectare imobil
-                    imobile_dict = {i['id']: i['nume'] for i in res_imobile.data}
+                    imobile_dict = {i['id']: i['nume'] for i in imobile_lista}
                     imobil_selectat = st.selectbox(
                         "Imobil*",
                         options=list(imobile_dict.keys()),

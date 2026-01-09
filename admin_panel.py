@@ -7,6 +7,7 @@ import pandas as pd
 from supabase import Client
 import auth
 from datetime import datetime
+from io import BytesIO
 
 def show_users_management(supabase: Client):
     """Gestionare utilizatori (doar pentru admini)"""
