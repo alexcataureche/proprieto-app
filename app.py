@@ -520,7 +520,8 @@ elif page == "🏠 Gestiune Imobile":
                     st.error("Eroare la încărcarea utilizatorilor")
 
                 # Proprietarul 1 (utilizatorul curent)
-                st.markdown(f"**Proprietar 1:** {st.session_state.user_name} (Tu)")
+                user_display_name = st.session_state.get('user_name', st.session_state.get('user_email', 'Utilizator'))
+                st.markdown(f"**Proprietar 1:** {user_display_name} (Tu)")
                 procent1 = st.slider("Procent proprietate (%)", 0, 100, 50, key="proc1")
 
                 # Proprietarul 2
