@@ -142,7 +142,7 @@ def genereaza_pdf_d212(fisc, an_fiscal):
         pdf.set_font("Helvetica", "B", 14)
         pdf.cell(0, 10, f"TOTAL DE PLATA: {fisc['total_taxe']:,.2f} RON", ln=True, border=1, align="C")
 
-        return pdf.output()
+        return bytes(pdf.output())
     except Exception as e:
         # Fallback: returnează un PDF minimal
         pdf = FPDF()
@@ -154,7 +154,7 @@ def genereaza_pdf_d212(fisc, an_fiscal):
         pdf.cell(0, 8, f"Impozit: {fisc['impozit']:,.2f} RON", ln=True)
         pdf.cell(0, 8, f"CASS: {fisc['cass']:,.2f} RON", ln=True)
         pdf.cell(0, 8, f"Prag CASS D212: {fisc['prag']}", ln=True)
-        return pdf.output()
+        return bytes(pdf.output())
 
 # --- INTERFAȚĂ ---
 st.sidebar.title("🏢 Proprieto ANAF 2026")
