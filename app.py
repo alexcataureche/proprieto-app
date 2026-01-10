@@ -564,8 +564,40 @@ def genereaza_pdf_d212(fisc, an_fiscal):
 
 # --- VERIFICARE CONEXIUNE DB ---
 if not DB_CONNECTED:
-    st.error("🔌 Aplicația nu poate funcționa fără conexiune la baza de date.")
-    st.info("Configurează SUPABASE_URL și SUPABASE_KEY în Settings > Secrets")
+    # Force white background for error page
+    st.markdown("""
+    <style>
+        .stApp {
+            background-color: #FFFFFF !important;
+        }
+        .main {
+            background-color: #FFFFFF !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.error("🔌 **EROARE CRITICĂ:** Aplicația nu poate funcționa fără conexiune la baza de date.")
+    st.warning("⚠️ **Cauză:** Lipsesc credențialele Supabase din Streamlit Cloud")
+
+    st.markdown("---")
+    st.markdown("### 🔧 Cum rezolvi:")
+    st.markdown("""
+    1. Mergi la **https://share.streamlit.io**
+    2. Click pe aplicația ta
+    3. Click pe **Settings** (iconița ⚙️)
+    4. Click pe **Secrets**
+    5. Adaugă următoarele credențiale:
+
+    ```toml
+    SUPABASE_URL = "https://your-project.supabase.co"
+    SUPABASE_KEY = "your-anon-key-here"
+    ```
+
+    6. Click **Save**
+    7. Aplicația se va restarta automat
+    """)
+
+    st.info("💡 **Găsești credențialele** în Dashboard-ul Supabase → Settings → API")
     st.stop()
 
 # ==================== AUTENTIFICARE ====================
