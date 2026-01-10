@@ -160,46 +160,19 @@ st.markdown("""
         color: white !important;
     }
 
-    /* Radio buttons in sidebar - Navigation Menu */
-    [data-testid="stSidebar"] .stRadio {
-        padding: 1rem 0;
-    }
-
-    [data-testid="stSidebar"] .stRadio > label {
-        display: none !important; /* Hide "Navigare:" label */
-    }
-
-    [data-testid="stSidebar"] .stRadio > div {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
+    /* Radio buttons in sidebar */
     [data-testid="stSidebar"] .stRadio label {
-        background-color: rgba(255,255,255,0.15);
-        padding: 1rem 1.25rem;
-        border-radius: 10px;
-        margin: 0;
+        background-color: rgba(255,255,255,0.1);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        margin: 0.25rem 0;
         cursor: pointer;
         transition: all 0.3s ease;
-        border: 2px solid transparent;
-        font-size: 1rem;
-        font-weight: 500;
     }
 
     [data-testid="stSidebar"] .stRadio label:hover {
-        background-color: rgba(255,255,255,0.25);
+        background-color: rgba(255,255,255,0.2);
         transform: translateX(5px);
-        border-color: rgba(255,255,255,0.3);
-    }
-
-    /* Active radio button */
-    [data-testid="stSidebar"] .stRadio input:checked + div label {
-        background-color: white !important;
-        color: var(--primary-color) !important;
-        font-weight: 700;
-        border-color: white;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 
     /* ============================================
@@ -411,7 +384,6 @@ st.markdown("""
         font-weight: 600;
         display: inline-block;
     }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -627,17 +599,13 @@ with st.sidebar:
         auth.logout_user()
         st.rerun()
 
-# Meniu de navigare în sidebar (Streamlit native)
-pages_user = ["🏠 Gestiune Imobile", "📄 Gestiune Contracte", "📊 Dashboard Fiscal", "👤 Cont"]
+# Meniu de navigare
+pages_user = ["📊 Dashboard Fiscal", "🏠 Gestiune Imobile", "📄 Gestiune Contracte", "👤 Cont"]
 
 if auth.is_admin():
     pages_user.append("⚙️ Administrare")
 
-page = st.sidebar.radio(
-    "Navigare:",
-    pages_user,
-    label_visibility="collapsed"
-)
+page = st.sidebar.radio("Navigare:", pages_user)
 
 # ==================== PAGINĂ: CONT ====================
 if page == "👤 Cont":
@@ -1421,16 +1389,7 @@ elif page == "🏠 Gestiune Imobile":
                         submitted_copro = st.form_submit_button("💾 Creează Co-proprietate", use_container_width=True, disabled=True)
 
     # Listare imobile existente
-    st.markdown("---")
-
-    # Header with title and button
-    col_header1, col_header2 = st.columns([3, 1])
-    with col_header1:
-        st.markdown("### 📋 Portofoliu Imobiliar")
-    with col_header2:
-        if st.button("➕ Adaugă Imobil Nou", key="add_property_btn", type="primary", use_container_width=True):
-            st.session_state.show_add_form = True
-            st.rerun()
+    st.markdown("### 📋 Imobile Înregistrate")
 
     # Filtrare pentru admini
     if auth.is_admin():
@@ -1466,84 +1425,73 @@ elif page == "🏠 Gestiune Imobile":
         if not imobile_lista:
             st.info("📭 Niciun imobil înregistrat încă.")
         else:
-            # Display properties table
             for imobil in imobile_lista:
                 # Preia toți co-proprietarii
                 coproprietari = coproprietate.get_coproprietari_imobil(supabase, imobil['id'])
 
-                # Get co-owner info
-                cota_user = next((p['procent_proprietate'] for p in coproprietari
-                                if p['user_id'] == (selected_user_filter if selected_user_filter != "all" else st.session_state.user_id)), 0)
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 1])
 
-                # Determine co-proprietor names
-                if len(coproprietari) > 1:
-                    coprop_names = ", ".join([p['users']['nume'] for p in coproprietari if p.get('users') and p['user_id'] != st.session_state.user_id])
-                    if not coprop_names:
-                        coprop_names = "-"
-                else:
-                    coprop_names = "-"
+                    with col1:
+                        st.markdown(f"**{imobil['nume']}**")
+                        if imobil.get('adresa'):
+                            st.caption(f"📍 {imobil['adresa']}")
 
-                # Create table row
-                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                        # Afișează toți co-proprietarii
+                        if coproprietari:
+                            if len(coproprietari) == 1:
+                                prop = coproprietari[0]
+                                if prop.get('users'):
+                                    st.caption(f"👤 Proprietar: {prop['users']['nume']} ({prop['procent_proprietate']}%)")
+                            else:
+                                st.caption("👥 Co-proprietari:")
+                                for prop in coproprietari:
+                                    if prop.get('users'):
+                                        icon = "👑" if prop['user_id'] == st.session_state.user_id else "👤"
+                                        st.caption(f"  {icon} {prop['users']['nume']}: {prop['procent_proprietate']}%")
 
-                with col1:
-                    # Nume Identificare (Navy, Bold)
-                    st.markdown(f"<p style='color: var(--navy); font-weight: 700; margin: 0;'>{imobil['nume']}</p>", unsafe_allow_html=True)
-                    if imobil.get('adresa'):
-                        st.caption(f"📍 {imobil['adresa']}")
+                    with col2:
+                        # Afișare cotă totală
+                        cota_totala = coproprietate.get_procent_total_imobil(supabase, imobil['id'])
+                        color = "normal" if cota_totala == 100 else "off"
+                        st.metric("Cotă totală", f"{cota_totala}%")
 
-                with col2:
-                    # Procent Proprietate (Badge)
-                    procent = int(cota_user) if cota_user else 0
-                    if procent == 100:
-                        badge_class = "badge-success"
-                    elif procent > 0:
-                        badge_class = "badge-warning"
-                    else:
-                        badge_class = "badge-danger"
+                        # Cotă utilizatorului curent
+                        if not auth.is_admin() or selected_user_filter != "all":
+                            cota_user = next((p['procent_proprietate'] for p in coproprietari
+                                            if p['user_id'] == (selected_user_filter if selected_user_filter != "all" else st.session_state.user_id)), 0)
+                            if cota_user > 0:
+                                st.caption(f"Tu: {cota_user}%")
 
-                    st.markdown(f"<span class='{badge_class}'>{procent}%</span>", unsafe_allow_html=True)
+                    with col3:
+                        # Verificare permisiune de editare/ștergere
+                        can_edit = coproprietate.user_poate_edita_imobil(
+                            supabase,
+                            st.session_state.user_id,
+                            imobil['id'],
+                            auth.is_admin()
+                        )
 
-                with col3:
-                    # Nume CoProprietar (Gray-500)
-                    if coprop_names == "-":
-                        st.markdown(f"<p style='color: var(--gray-500); margin: 0;'>-</p>", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"<p style='color: var(--gray-500); margin: 0;'>{coprop_names}</p>", unsafe_allow_html=True)
-
-                with col4:
-                    # Acțiuni (Edit/Ștergere icons)
-                    can_edit = coproprietate.user_poate_edita_imobil(
-                        supabase,
-                        st.session_state.user_id,
-                        imobil['id'],
-                        auth.is_admin()
-                    )
-
-                    if can_edit:
-                        col_edit, col_manage, col_delete = st.columns(3)
-
-                        with col_edit:
-                            if st.button("✏️", key=f"edit_{imobil['id']}", help="Editează"):
+                        if can_edit:
+                            # Buton editare imobil
+                            if st.button("✏️", key=f"edit_{imobil['id']}", help="Editează imobil"):
                                 st.session_state[f"editing_{imobil['id']}"] = True
                                 st.rerun()
 
-                        with col_manage:
-                            if st.button("⚙️", key=f"manage_{imobil['id']}", help="Co-proprietari"):
+                            # Buton gestionare co-proprietari
+                            if st.button("⚙️", key=f"manage_{imobil['id']}", help="Gestionează co-proprietari"):
                                 st.session_state[f"managing_{imobil['id']}"] = True
                                 st.rerun()
 
-                        with col_delete:
+                            # Buton ștergere (doar dacă e ultimul proprietar sau admin)
                             if auth.is_admin() or len(coproprietari) == 1:
-                                if st.button("🗑️", key=f"del_imobil_{imobil['id']}", help="Șterge"):
+                                if st.button("🗑️", key=f"del_imobil_{imobil['id']}", help="Șterge imobil"):
                                     try:
                                         supabase.table("imobile").delete().eq("id", imobil['id']).execute()
                                         st.success("✅ Imobil șters!")
                                         st.rerun()
                                     except Exception as e:
                                         st.error(f"❌ Eroare: {str(e)}")
-
-                st.markdown("---")
 
                     # Panel editare imobil
                     if st.session_state.get(f"editing_{imobil['id']}", False):
@@ -2053,16 +2001,7 @@ elif page == "📄 Gestiune Contracte":
                                 st.error(f"❌ Eroare la salvare: {str(e)}")
 
             # Listare contracte existente
-            st.markdown("---")
-
-            # Header with title and button
-            col_header1, col_header2 = st.columns([3, 1])
-            with col_header1:
-                st.markdown("### 📋 Contracte Active")
-            with col_header2:
-                if st.button("➕ Adaugă Contract Nou", key="add_contract_btn", type="primary", use_container_width=True):
-                    st.session_state.show_add_contract_form = True
-                    st.rerun()
+            st.markdown("### 📋 Contracte Active")
 
             # Filtrare pentru admini
             if auth.is_admin():
@@ -2093,84 +2032,49 @@ elif page == "📄 Gestiune Contracte":
                 if not res_contracte.data:
                     st.info("📭 Niciun contract înregistrat încă.")
                 else:
-                    # Display contracts table
                     for contract in res_contracte.data:
-                        # Calculate contract status
-                        today = datetime.date.today()
-                        data_start = datetime.datetime.fromisoformat(contract['data_inceput']).date()
-                        if contract.get('data_sfarsit'):
-                            data_end = datetime.datetime.fromisoformat(contract['data_sfarsit']).date()
-                            days_until_end = (data_end - today).days
+                        with st.container():
+                            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
 
-                            if days_until_end < 0:
-                                status = "Expirat"
-                                status_class = "badge-danger"
-                            elif days_until_end <= 30:
-                                status = "Expiră curând"
-                                status_class = "badge-warning"
-                            else:
-                                status = "Activ"
-                                status_class = "badge-success"
-                        else:
-                            status = "Activ"
-                            status_class = "badge-success"
-                            data_end = None
+                            with col1:
+                                st.markdown(f"**{contract['locatar']}**")
+                                st.caption(f"🏠 {contract['imobile']['nume']}")
+                                if contract.get('nr_contract'):
+                                    st.caption(f"📋 {contract['nr_contract']}")
+                                # Afișează proprietarul pentru admini
+                                if auth.is_admin() and contract.get('users'):
+                                    st.caption(f"👤 {contract['users']['nume']}")
 
-                        # Create table row
-                        col1, col2, col3, col4, col5, col6 = st.columns([3, 2, 2, 2, 1.5, 1])
+                            with col2:
+                                st.metric("Chirie", f"{contract['chirie_lunara']:,.0f} {contract['moneda']}")
 
-                        with col1:
-                            # Chiriaș (Bold Name + Subtext contact)
-                            st.markdown(f"<p style='color: var(--navy); font-weight: 700; margin: 0; font-size: 1.1rem;'>{contract['locatar']}</p>", unsafe_allow_html=True)
-                            contact_info = f"📞 {contract.get('locatar_telefon', 'N/A')}"
-                            if contract.get('locatar_email'):
-                                contact_info += f" • ✉️ {contract['locatar_email']}"
-                            st.caption(contact_info)
+                            with col3:
+                                data_start = contract['data_inceput']
+                                data_end = contract['data_sfarsit'] if contract.get('data_sfarsit') else "Nedeterminat"
+                                st.text(f"📅 {data_start}")
+                                st.text(f"→ {data_end}")
 
-                        with col2:
-                            # Imobil (Text)
-                            st.markdown(f"<p style='color: var(--navy); margin: 0;'>{contract['imobile']['nume']}</p>", unsafe_allow_html=True)
-                            if contract.get('nr_contract'):
-                                st.caption(f"📋 {contract['nr_contract']}")
+                            with col4:
+                                if contract.get('pdf_url'):
+                                    st.link_button("📄", contract['pdf_url'], help="Vezi contract")
 
-                        with col3:
-                            # Chirie (Primary Blue, Bold)
-                            st.markdown(f"<p style='color: var(--primary-color); font-weight: 700; margin: 0; font-size: 1.2rem;'>{contract['chirie_lunara']:,.0f} {contract['moneda']}</p>", unsafe_allow_html=True)
-                            st.caption(f"Frecvență: {contract.get('frecventa_plata', 'lunar')}")
-
-                        with col4:
-                            # Valabilitate (Dates)
-                            st.markdown(f"<p style='margin: 0;'>📅 {data_start.strftime('%d.%m.%Y')}</p>", unsafe_allow_html=True)
-                            if data_end:
-                                st.markdown(f"<p style='margin: 0;'>→ {data_end.strftime('%d.%m.%Y')}</p>", unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"<p style='margin: 0; color: var(--gray-500);'>→ Nedeterminat</p>", unsafe_allow_html=True)
-
-                        with col5:
-                            # Status (Active/Expiring Badge)
-                            st.markdown(f"<span class='{status_class}'>{status}</span>", unsafe_allow_html=True)
-
-                        with col6:
-                            # Acțiuni
-                            can_edit_c = auth.is_admin() or contract.get('user_id') == st.session_state.user_id
-                            if can_edit_c:
-                                col_edit, col_delete = st.columns(2)
-
-                                with col_edit:
-                                    if st.button("✏️", key=f"edit_contract_{contract['id']}", help="Editează"):
+                                # Adminii pot edita orice, userii doar ale lor
+                                can_edit_c = auth.is_admin() or contract.get('user_id') == st.session_state.user_id
+                                if can_edit_c:
+                                    if st.button("✏️", key=f"edit_contract_{contract['id']}", help="Editează contract"):
                                         st.session_state[f"editing_contract_{contract['id']}"] = True
                                         st.rerun()
 
-                                with col_delete:
-                                    if st.button("🗑️", key=f"del_contract_{contract['id']}", help="Șterge"):
+                                # Adminii pot șterge orice, userii doar ale lor
+                                can_delete_c = auth.is_admin() or contract.get('user_id') == st.session_state.user_id
+                                if can_delete_c:
+                                    if st.button("🗑️", key=f"del_contract_{contract['id']}", help="Șterge contract"):
                                         try:
                                             supabase.table("contracte").delete().eq("id", contract['id']).execute()
                                             st.success("✅ Contract șters!")
                                             st.rerun()
                                         except Exception as e:
                                             st.error(f"❌ {str(e)}")
-
-                        st.markdown("---")
 
                             # Panel editare contract
                             if st.session_state.get(f"editing_contract_{contract['id']}", False):
