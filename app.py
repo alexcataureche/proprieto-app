@@ -160,19 +160,46 @@ st.markdown("""
         color: white !important;
     }
 
-    /* Radio buttons in sidebar */
+    /* Radio buttons in sidebar - Navigation Menu */
+    [data-testid="stSidebar"] .stRadio {
+        padding: 1rem 0;
+    }
+
+    [data-testid="stSidebar"] .stRadio > label {
+        display: none !important; /* Hide "Navigare:" label */
+    }
+
+    [data-testid="stSidebar"] .stRadio > div {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
     [data-testid="stSidebar"] .stRadio label {
-        background-color: rgba(255,255,255,0.1);
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        margin: 0.25rem 0;
+        background-color: rgba(255,255,255,0.15);
+        padding: 1rem 1.25rem;
+        border-radius: 10px;
+        margin: 0;
         cursor: pointer;
         transition: all 0.3s ease;
+        border: 2px solid transparent;
+        font-size: 1rem;
+        font-weight: 500;
     }
 
     [data-testid="stSidebar"] .stRadio label:hover {
-        background-color: rgba(255,255,255,0.2);
+        background-color: rgba(255,255,255,0.25);
         transform: translateX(5px);
+        border-color: rgba(255,255,255,0.3);
+    }
+
+    /* Active radio button */
+    [data-testid="stSidebar"] .stRadio input:checked + div label {
+        background-color: white !important;
+        color: var(--primary-color) !important;
+        font-weight: 700;
+        border-color: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 
     /* ============================================
@@ -385,47 +412,6 @@ st.markdown("""
         display: inline-block;
     }
 
-    /* ============================================
-       HORIZONTAL MENU NAVIGATION
-       ============================================ */
-    .horizontal-menu {
-        display: flex;
-        gap: 0;
-        background: var(--surface);
-        border-bottom: 2px solid var(--border-color);
-        padding: 0;
-        margin: -2rem -3rem 2rem -3rem;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-    }
-
-    .menu-item {
-        padding: 1rem 1.5rem;
-        color: var(--gray-600);
-        text-decoration: none;
-        font-weight: 500;
-        border-bottom: 3px solid transparent;
-        transition: all 0.2s ease;
-        cursor: pointer;
-        background: transparent;
-        border: none;
-        font-size: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .menu-item:hover {
-        color: var(--primary-color);
-        background: var(--border-hover);
-    }
-
-    .menu-item.active {
-        color: var(--primary-color);
-        border-bottom-color: var(--primary-color);
-        font-weight: 600;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -641,47 +627,17 @@ with st.sidebar:
         auth.logout_user()
         st.rerun()
 
-# Meniu de navigare - Horizontal Menu
-# Initialize active page in session state
-if 'active_page' not in st.session_state:
-    st.session_state.active_page = "🏠 Gestiune Imobile"
-
-# Main menu items (exact order as specified)
-main_menu_items = ["🏠 Gestiune Imobile", "📄 Gestiune Contracte", "📊 Dashboard Fiscal"]
-
-# Create horizontal menu
-cols = st.columns([2, 2, 2, 1, 1, 1])
-
-for idx, menu_item in enumerate(main_menu_items):
-    with cols[idx]:
-        # Extract text without emoji for display
-        clean_text = menu_item.replace("🏠 ", "").replace("📄 ", "").replace("📊 ", "")
-
-        # Check if this is the active page
-        is_active = st.session_state.active_page == menu_item
-
-        # Create button with custom styling
-        if st.button(clean_text, key=f"menu_{idx}", use_container_width=True, type="primary" if is_active else "secondary"):
-            st.session_state.active_page = menu_item
-            st.rerun()
-
-# Additional menu items in sidebar for Cont and Administrare
-with cols[4]:
-    if st.button("👤 Cont", key="menu_cont", use_container_width=True, type="primary" if st.session_state.active_page == "👤 Cont" else "secondary"):
-        st.session_state.active_page = "👤 Cont"
-        st.rerun()
+# Meniu de navigare în sidebar (Streamlit native)
+pages_user = ["🏠 Gestiune Imobile", "📄 Gestiune Contracte", "📊 Dashboard Fiscal", "👤 Cont"]
 
 if auth.is_admin():
-    with cols[5]:
-        if st.button("⚙️ Admin", key="menu_admin", use_container_width=True, type="primary" if st.session_state.active_page == "⚙️ Administrare" else "secondary"):
-            st.session_state.active_page = "⚙️ Administrare"
-            st.rerun()
+    pages_user.append("⚙️ Administrare")
 
-# Horizontal divider
-st.markdown("---")
-
-# Set current page
-page = st.session_state.active_page
+page = st.sidebar.radio(
+    "Navigare:",
+    pages_user,
+    label_visibility="collapsed"
+)
 
 # ==================== PAGINĂ: CONT ====================
 if page == "👤 Cont":
