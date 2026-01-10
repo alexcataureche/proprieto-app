@@ -978,7 +978,7 @@ elif page == "⚙️ Administrare" and auth.is_admin():
         admin_panel.show_system_settings(supabase)
 
 # ==================== PAGINA 1: DASHBOARD FISCAL ====================
-if page == "📊 Dashboard Fiscal":
+elif page == "📊 Dashboard Fiscal":
     st.title("📊 Monitorizare Venituri și Calculatoare Fiscale")
 
     # Filtrare pentru admini
