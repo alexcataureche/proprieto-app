@@ -56,18 +56,34 @@ st.markdown("""
     /* ============================================
        MAIN LAYOUT - LIGHT BACKGROUND
        ============================================ */
+    /* Force light background everywhere */
+    .stApp {
+        background-color: #F8FAFC !important;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        background-color: #F8FAFC !important;
+    }
+
     .main {
         padding: 2rem 3rem;
-        background: var(--app-bg) !important;  /* Solid light background */
+        background-color: #F8FAFC !important;
+        background: #F8FAFC !important;
     }
 
     .block-container {
         padding: 2rem 1rem;
         max-width: 1400px;
-        background: var(--surface);
+        background-color: #FFFFFF !important;
+        background: #FFFFFF !important;
         border-radius: 15px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        border: 1px solid var(--border-color);
+        border: 1px solid #E2E8F0;
+    }
+
+    /* Force all content areas to be light */
+    section[data-testid="stSidebar"] ~ * {
+        background-color: #F8FAFC !important;
     }
 
     /* ============================================
