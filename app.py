@@ -617,6 +617,14 @@ with st.sidebar:
         auth.logout_user()
         st.rerun()
 
+    # Status conexiune DB
+    st.markdown("---")
+    if DB_CONNECTED:
+        st.success("✅ Conectat la baza de date")
+    else:
+        st.error("❌ Fără conexiune la DB")
+        st.caption("Verifică Secrets în Streamlit Cloud")
+
 # Meniu de navigare
 pages_user = ["📊 Dashboard Fiscal", "🏠 Gestiune Imobile", "📄 Gestiune Contracte", "👤 Cont"]
 
