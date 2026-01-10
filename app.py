@@ -21,6 +21,13 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* ============================================
+       FORCE LIGHT THEME - OVERRIDE EVERYTHING
+       ============================================ */
+    html, body {
+        background-color: #F8FAFC !important;
+    }
+
+    /* ============================================
        DESIGN SYSTEM - EXACT COLOR PALETTE
        ============================================ */
     :root {
