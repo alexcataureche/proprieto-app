@@ -21,13 +21,6 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* ============================================
-       FORCE LIGHT THEME - OVERRIDE EVERYTHING
-       ============================================ */
-    html, body {
-        background-color: #F8FAFC !important;
-    }
-
-    /* ============================================
        DESIGN SYSTEM - EXACT COLOR PALETTE
        ============================================ */
     :root {
@@ -63,36 +56,18 @@ st.markdown("""
     /* ============================================
        MAIN LAYOUT - LIGHT BACKGROUND
        ============================================ */
-    /* Override Streamlit's default dark theme */
-    .stApp {
-        background-color: #F8FAFC !important;
-    }
-
-    [data-testid="stAppViewContainer"] {
-        background-color: #F8FAFC !important;
-    }
-
-    [data-testid="stHeader"] {
-        background-color: #F8FAFC !important;
-    }
-
     .main {
         padding: 2rem 3rem;
-        background-color: #F8FAFC !important;
+        background: var(--app-bg) !important;  /* Solid light background */
     }
 
     .block-container {
         padding: 2rem 1rem;
         max-width: 1400px;
-        background-color: #FFFFFF !important;
+        background: var(--surface);
         border-radius: 15px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        border: 1px solid #E2E8F0;
-    }
-
-    /* Ensure all sections are light */
-    section[data-testid="stSidebar"] ~ * {
-        background-color: #F8FAFC !important;
+        border: 1px solid var(--border-color);
     }
 
     /* ============================================
@@ -564,40 +539,8 @@ def genereaza_pdf_d212(fisc, an_fiscal):
 
 # --- VERIFICARE CONEXIUNE DB ---
 if not DB_CONNECTED:
-    # Force white background for error page
-    st.markdown("""
-    <style>
-        .stApp {
-            background-color: #FFFFFF !important;
-        }
-        .main {
-            background-color: #FFFFFF !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.error("🔌 **EROARE CRITICĂ:** Aplicația nu poate funcționa fără conexiune la baza de date.")
-    st.warning("⚠️ **Cauză:** Lipsesc credențialele Supabase din Streamlit Cloud")
-
-    st.markdown("---")
-    st.markdown("### 🔧 Cum rezolvi:")
-    st.markdown("""
-    1. Mergi la **https://share.streamlit.io**
-    2. Click pe aplicația ta
-    3. Click pe **Settings** (iconița ⚙️)
-    4. Click pe **Secrets**
-    5. Adaugă următoarele credențiale:
-
-    ```toml
-    SUPABASE_URL = "https://your-project.supabase.co"
-    SUPABASE_KEY = "your-anon-key-here"
-    ```
-
-    6. Click **Save**
-    7. Aplicația se va restarta automat
-    """)
-
-    st.info("💡 **Găsești credențialele** în Dashboard-ul Supabase → Settings → API")
+    st.error("🔌 Aplicația nu poate funcționa fără conexiune la baza de date.")
+    st.info("Configurează SUPABASE_URL și SUPABASE_KEY în Settings > Secrets")
     st.stop()
 
 # ==================== AUTENTIFICARE ====================
@@ -655,14 +598,6 @@ with st.sidebar:
     if st.button("🚪 Deconectare", use_container_width=True):
         auth.logout_user()
         st.rerun()
-
-    # Status conexiune DB
-    st.markdown("---")
-    if DB_CONNECTED:
-        st.success("✅ Conectat la baza de date")
-    else:
-        st.error("❌ Fără conexiune la DB")
-        st.caption("Verifică Secrets în Streamlit Cloud")
 
 # Meniu de navigare
 pages_user = ["📊 Dashboard Fiscal", "🏠 Gestiune Imobile", "📄 Gestiune Contracte", "👤 Cont"]
